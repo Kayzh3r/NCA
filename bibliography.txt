@@ -1,0 +1,12 @@
+RNNoise:
+	https://people.xiph.org/~jm/demo/rnnoise/
+	https://github.com/xiph/rnnoise
+Noise Reduce (no NN):
+	https://github.com/timsainb/noisereduce
+Noise reduction with GRUs
+	https://github.com/ShinoharaYuuyoru/NoiseReductionUsingGRU
+	https://github.com/adityatb/noise-reduction-using-rnn
+	
+Spotipy (Spotify API for Python)
+	https://github.com/plamere/spotipy
+	http://gerardoprieto.com/2019/02/12/jugando-con-python-y-el-api-de-spotify/
