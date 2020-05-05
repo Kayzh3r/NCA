@@ -1,5 +1,7 @@
 import sqlite3
 import os
+from socket import gethostname
+from getpass import getuser
 
 
 class DBManager:
@@ -31,21 +33,22 @@ class DBManager:
                 self.__exists = True
             else:
                 self.__connect()
-                query = "CREATE TABLE IF NOT EXISTS training_execution (".__add__(
+                query = "CREATE TABLE IF NOT EXISTS model_checkpoint (".__add__(
                         "id integer PRIMARY KEY,").__add__(
                         "datetime int NOT NULL,").__add__(
                         "user text NOT NULL,").__add__(
                         "machine text NOT NULL,").__add__(
-                        "model_id integer NOT NULL,").__add__(
-                        "model_checkpoint_path text NOT NULL)")
+                        "model_name name NOT NULL,").__add__(
+                        "model_version name NOT NULL,").__add__(
+                        "checkpoint_status name NOT NULL,").__add__(
+                        "checkpoint_path text NOT NULL)")
                 self.__cursor.execute(query)
                 query = "CREATE TABLE IF NOT EXISTS model_info (".__add__(
-                        "id integer NOT NULL,").__add__(
                         "name text NOT NULL,").__add__(
                         "version text NOT NULL,").__add__(
                         "status text NOT NULL,").__add__(
                         "path text NOT NULL,").__add__(
-                        "CONSTRAINT pk_model_info PRIMARY KEY (id, name, version))")
+                        "CONSTRAINT pk_model_info PRIMARY KEY (name, version))")
                 self.__cursor.execute(query)
                 query = "CREATE TABLE IF NOT EXISTS noise_files (".__add__(
                         "id integer PRIMARY KEY,").__add__(
@@ -150,18 +153,23 @@ class DBManager:
         except Exception as error:
             self.__close()
 
-    def modelCreate(self, name, url, path, channels, sampleRate, duration):
+    def modelCreate(self, name, version, pyFilePath, checkpointPath):
         try:
             self.__connect()
-            self.__cursor.execute(
-                "SELECT COALESCE(MAX(id) + 1,1) FROM model_info"
-            )
-            newId = self.__cursor.fetchall()
             query = "INSERT INTO model_info ".__add__(
-                    "(id, name, version, status, path) ").__add__(
-                    "VALUES (?,?,?,?,?)")
-            self.__cursor.execute(query, [int(newId[0][0]), name, url, path,
-                                          int(channels), int(sampleRate), duration, "OK"])
+                    "(name, version, status, path) ").__add__(
+                    "VALUES (?,?,?,?)")
+            self.__cursor.execute(query, [name, version, "CREATED", pyFilePath])
+            self.__cursor.execute(
+                    "SELECT COALESCE(MAX(id) + 1,1) FROM model_checkpoint"
+            )
+            newId = self.__cursor.fetchall()[0][0]
+            query = "INSERT INTO model_checkpoint ".__add__(
+                    "(id, datetime, user, machine, model_name, model_version, ").__add__(
+                    "checkpoint_status, checkpoint_path) ").__add__(
+                    "VALUES (?,datetime('now'),?,?,?,?,?,?)")
+            self.__cursor.execute(query, [int(newId), getuser(),
+                                          gethostname(), name, version, "CREATED", checkpointPath])
             self.__conn.commit()
             self.__close()
         except Exception as error:
@@ -179,20 +187,20 @@ class DBManager:
             if not cursorVal:
                 retVal = None
             else:
-                retVal = {'id'      : cursorVal[0][0],
-                          'name'    : cursorVal[0][1],
-                          'version' : cursorVal[0][2],
-                          'status'  : cursorVal[0][3],
-                          'path'    : cursorVal[0][4]}
+                retVal = {'name'    : cursorVal[0][0],
+                          'version' : cursorVal[0][1],
+                          'status'  : cursorVal[0][2],
+                          'path'    : cursorVal[0][3]}
                 query = "SELECT * ".__add__(
                         "FROM training_execution ").__add__(
-                        "WHERE model_id ='" + retVal['id'] + "'").__add__(
+                        "WHERE name ='" + name + "' ").__add__(
+                        "AND version ='" + ver + "' ").__add__(
                         "ORDER BY insert_datetime DESC ").__add__(
                         "LIMIT 1)")
                 self.__cursor.execute(query)
                 cursorVal = self.__cursor.fetchall()
-                retVal['train_id'] = cursorVal[0][0]
-                retVal['checkpoint_path'] = cursorVal[0][5]
+                retVal['checkpoint_status'] = cursorVal[0][6]
+                retVal['checkpoint_path'] = cursorVal[0][7]
             self.__close()
             return retVal
         except Exception as error:
