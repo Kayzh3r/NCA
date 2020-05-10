@@ -5,7 +5,23 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 
 
-class LibrivoxScraper():
+class Book:
+    def __init__(self, dataInfo, downloadInfo):
+        self.title      = dataInfo['title']
+        self.authorName = dataInfo['author']['name']
+        self.authorUrl  = dataInfo['author']['url']
+        self.state      = dataInfo['metadata']['state']
+        self.type       = dataInfo['metadata']['type']
+        self.language   = dataInfo['metadata']['language']
+        if downloadInfo:
+            self.url  = downloadInfo['url']
+            self.size = downloadInfo['size']
+        else:
+            self.url  = ''
+            self.size = ''
+
+
+class LibrivoxScraper:
     def __init__(self, webDriver=''):
         self.__mainURL     = r"https://librivox.org/search?"
         self.__primaryKey  = r"primary_key="
@@ -24,6 +40,7 @@ class LibrivoxScraper():
         self.__driverPath = None
         self.__browser = None
         self.setDriver(webDriver)
+        self.__books = []
 
     def setDriver(self, webDriver=''):
         self.__driverPath = webDriver
@@ -33,6 +50,42 @@ class LibrivoxScraper():
         else:
             self.__wrongInit = False
             self.__browser = webdriver.Chrome(self.__driverPath)
+
+    def __parseDownload(self, result):
+        downloadBtn = result.findAll('div', {'class': 'download-btn'})
+        if len(downloadBtn) != 1:
+            return None
+        else:
+            spanNode = downloadBtn[0].findAll('span')
+            if len(spanNode) != 1:
+                return None
+            downloadSize = spanNode[0].contents[0]
+            downloadUrl = downloadBtn[0].contents[1]['href']
+            downloadInfo = {'url'  : downloadUrl,
+                            'size' : downloadSize}
+            return downloadInfo
+
+    def __parseData(self, result):
+        data = result.findAll('div', {'class': 'result-data'})
+        bookTitle = data[0].findAll('h3')[0].findAll('a')[0].contents[0]
+        bookAuthor = data[0].findAll('p', {'class': 'book-author'})
+        if len(bookAuthor[0]) == 1:
+            authorName = bookAuthor[0].contents[0].strip()
+            authorUrl = ''
+        else:
+            authorName = bookAuthor[0].contents[1].contents[0].strip()
+            authorUrl = bookAuthor[0].contents[1]['href']
+        bookMeta = data[0].findAll('p', {'class': 'book-meta'})
+        values = [x.strip() for x in bookMeta[0].contents[0].strip().split('|')]
+        authorDict = {'name' : authorName,
+                      'url'  : authorUrl}
+        metadataDict = {'state'    : values[0],
+                        'type'     : values[1],
+                        'language' : values[2]}
+        dataInfo = {'title'    : bookTitle,
+                    'author'   : authorDict,
+                    'metadata' : metadataDict}
+        return dataInfo
 
     def getBooksByLanguage(self, language):
         if self.__wrongInit:
@@ -52,11 +105,14 @@ class LibrivoxScraper():
                   self.__searchPage + str(page) + \
                   self.__searchForm
             self.__browser.get(url)
-            time.sleep(random.uniform(0.3, 0.7))
+            time.sleep(random.uniform(0.7, 1))
             soup = BeautifulSoup(self.__browser.page_source, "html.parser")
             results = soup.findAll('li', {'class': 'catalog-result'})
-            #for results in results:
-
+            for result in results:
+                downloadInfo = self.__parseDownload(result)
+                dataInfo = self.__parseData(result)
+                if dataInfo:
+                    self.__books.append(Book(dataInfo, downloadInfo))
             page += 1
         self.__browser.close()
 
