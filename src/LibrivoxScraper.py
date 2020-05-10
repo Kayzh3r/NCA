@@ -49,7 +49,6 @@ class LibrivoxScraper:
             self.__wrongInit = True
         else:
             self.__wrongInit = False
-            self.__browser = webdriver.Chrome(self.__driverPath)
 
     def __parseDownload(self, result):
         downloadBtn = result.findAll('div', {'class': 'download-btn'})
@@ -91,6 +90,7 @@ class LibrivoxScraper:
         if self.__wrongInit:
             print('Driver does not exist')
             return None
+        self.__browser = webdriver.Chrome(self.__driverPath)
         if language not in self.__languages.keys():
             print('Unknown requested language')
             print('Known languages are:')

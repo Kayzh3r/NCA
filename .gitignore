@@ -130,3 +130,5 @@ dmypy.json
 
 # Training Data
 ./src/download
+# Database
+*.db
