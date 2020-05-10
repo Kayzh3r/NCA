@@ -98,6 +98,8 @@ class LibrivoxScraper:
             return None
         availablePage = True
         page = 1
+        increaseSleep = 0
+        lastPage = 0
         while availablePage:
             url = self.__mainURL + \
                   self.__primaryKey + str(self.__languages[language]) + \
@@ -105,18 +107,30 @@ class LibrivoxScraper:
                   self.__searchPage + str(page) + \
                   self.__searchForm
             self.__browser.get(url)
-            time.sleep(random.uniform(0.7, 1))
+            time.sleep(increaseSleep + random.uniform(0.5, 1))
             soup = BeautifulSoup(self.__browser.page_source, "html.parser")
             results = soup.findAll('li', {'class': 'catalog-result'})
+            lastPageNode = soup.findAll('a', {'class': 'page-number last'})
+            if lastPage == 0:
+                lastPage = int(lastPageNode[0]['data-page_number'])
+            if len(lastPageNode) == 0:
+                increaseSleep = 1
+                continue
+            else:
+                increaseSleep = 0
             for result in results:
                 downloadInfo = self.__parseDownload(result)
                 dataInfo = self.__parseData(result)
                 if dataInfo:
                     self.__books.append(Book(dataInfo, downloadInfo))
+            if page == lastPage:
+                availablePage = False
             page += 1
         self.__browser.close()
+        return self.__books
 
 
 if __name__ == '__main__':
     myScraper = LibrivoxScraper(r"C:\Program Files (x86)\Google\ChromeDriver\chromedriver.exe")
-    myScraper.getBooksByLanguage('spanish')
+    books = myScraper.getBooksByLanguage('spanish')
+    print(len(books))
