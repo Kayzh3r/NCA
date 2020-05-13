@@ -2,14 +2,14 @@ from src.DBManager import DBManager
 from src.LibrivoxScraper import LibrivoxScraper, Book
 import audioread
 import os
-import requests
 import re
 
+
 class AudioBooksManager:
-    def __init__(self, db=DBManager()):
+    def __init__(self, db=DBManager(), driver=None):
         self.db = db
         self.__languages = ['spanish']
-        self.__librivoxScraper = LibrivoxScraper(r"C:\Program Files (x86)\Google\ChromeDriver\chromedriver.exe")
+        self.__librivoxScraper = LibrivoxScraper(driver)
         self.__books = {}
 
     def __getBooks(self, language):
@@ -28,10 +28,7 @@ class AudioBooksManager:
                 filename = os.path.join(dstPath, os.path.basename(book.url))
                 if not os.path.isfile(filename):
                     downloadNow = True
-                    request = requests.get(book.url)
-                    with open(filename, 'wb') as fId:
-                        fId.write(request.content)
-
+                    self.__librivoxScraper.downloadFile(url=book.url, filename=filename, downloadLib='requests')
                 '''if downloadNow:
                     if self.db.noiseExist(key):
                         self.db.noiseUpdateStatusByName(key, 'DELETED')
@@ -47,5 +44,5 @@ class AudioBooksManager:
 
 
 if __name__ == '__main__':
-    audioBooksManager = AudioBooksManager()
+    audioBooksManager = AudioBooksManager(driver=r"C:\Program Files (x86)\Google\ChromeDriver\chromedriver.exe")
     audioBooksManager.downloadData()

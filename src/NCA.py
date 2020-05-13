@@ -6,12 +6,15 @@ import imp
 from tensorflow import keras
 from src.DBManager import DBManager
 from src.NoiseManager import NoiseManager
+from src.AudioBooksManager import AudioBooksManager
 
 
 class NCA:
     def __init__(self, modelName, modelVersion, modelPyFile=None):
+        self.__chromeDriverPath = r"C:\Program Files (x86)\Google\ChromeDriver\chromedriver.exe"
         self.db = DBManager()
         self.noise = NoiseManager(self.db)
+        self.audioBooks = AudioBooksManager(self.db, self.__chromeDriverPath)
         self.__model = None
         self.__modelName = modelName
         self.__modelVer = modelVersion

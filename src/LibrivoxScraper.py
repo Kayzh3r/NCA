@@ -3,6 +3,8 @@ import random
 import os
 from selenium import webdriver
 from bs4 import BeautifulSoup
+import requests
+from tqdm import tqdm
 
 
 class Book:
@@ -111,13 +113,13 @@ class LibrivoxScraper:
             soup = BeautifulSoup(self.__browser.page_source, "html.parser")
             results = soup.findAll('li', {'class': 'catalog-result'})
             lastPageNode = soup.findAll('a', {'class': 'page-number last'})
-            if lastPage == 0:
-                lastPage = int(lastPageNode[0]['data-page_number'])
             if len(lastPageNode) == 0:
-                increaseSleep = 1
+                increaseSleep += 1
                 continue
             else:
                 increaseSleep = 0
+            if lastPage == 0:
+                lastPage = int(lastPageNode[0]['data-page_number'])
             for result in results:
                 downloadInfo = self.__parseDownload(result)
                 dataInfo = self.__parseData(result)
@@ -128,6 +130,23 @@ class LibrivoxScraper:
             page += 1
         self.__browser.close()
         return self.__books
+
+    def downloadFile(self, url='', filename='', downloadLib='requests'):
+        if downloadLib == 'selenium':
+            chrome_options = webdriver.ChromeOptions()
+            prefs = {'download.default_directory': filename}
+            chrome_options.add_experimental_option('prefs', prefs)
+            if self.__wrongInit:
+                print('Driver does not exist')
+                return None
+            self.__browser = webdriver.Chrome(self.__driverPath, chrome_options=chrome_options)
+            self.__browser.get(url)
+            self.__browser.close()
+        else:
+            response = requests.get(url, stream=True)
+            with open(filename, "wb") as handle:
+                for data in tqdm(response.iter_content()):
+                    handle.write(data)
 
 
 if __name__ == '__main__':

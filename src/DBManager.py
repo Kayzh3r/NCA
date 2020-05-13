@@ -61,6 +61,20 @@ class DBManager:
                         "status text NOT NULL,").__add__(
                         "insert_datetime int NOT NULL)")
                 self.__cursor.execute(query)
+                query = "CREATE TABLE IF NOT EXISTS audio_books_tracks (".__add__(
+                        "id integer PRIMARY KEY,").__add__(
+                        "book_name text NOT NULL,").__add__(
+                        "book_author text NOT NULL,").__add__(
+                        "book_url text NOT NULL,").__add__(
+                        "book_language text NOT NULL,").__add__(
+                        "book_path text NOT NULL,").__add__(
+                        "track_name text NOT NULL,").__add__(
+                        "track_channels int NOT NULL,").__add__(
+                        "track_sample_rate int NOT NULL,").__add__(
+                        "track_duration real NOT NULL,").__add__(
+                        "track_status text NOT NULL,").__add__(
+                        "track_insert_datetime int NOT NULL)")
+                self.__cursor.execute(query)
                 self.__conn.commit()
                 self.__close()
         except Exception:
