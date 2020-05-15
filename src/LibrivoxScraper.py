@@ -16,6 +16,7 @@ class Book:
         self.type       = dataInfo['metadata']['type']
         self.language   = dataInfo['metadata']['language']
         self.dummy      = ''
+        self.nTracks    = 0
         if downloadInfo:
             self.url  = downloadInfo['url']
             self.size = downloadInfo['size']
@@ -32,6 +33,7 @@ class Track(Book):
         self.sampleRate = 0
         self.duration = 0
         self.path = ''
+        self.zip = ''
 
 
 class LibrivoxScraper:
@@ -62,6 +64,12 @@ class LibrivoxScraper:
             self.__wrongInit = True
         else:
             self.__wrongInit = False
+
+    def __bookExists(self, title):
+        for book in self.__books:
+            if book.title == title:
+                return True
+        return False
 
     def __parseDownload(self, result):
         downloadBtn = result.findAll('div', {'class': 'download-btn'})
@@ -135,7 +143,9 @@ class LibrivoxScraper:
                 downloadInfo = self.__parseDownload(result)
                 dataInfo = self.__parseData(result)
                 if dataInfo:
-                    self.__books.append(Book(dataInfo, downloadInfo))
+                    if not self.__bookExists(dataInfo['title']):
+                        print('Get info for book ' + dataInfo['title'])
+                        self.__books.append(Book(dataInfo, downloadInfo))
             if page == lastPage:
                 availablePage = False
             page += 1

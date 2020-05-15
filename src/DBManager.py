@@ -38,9 +38,9 @@ class DBManager:
                         "datetime int NOT NULL,").__add__(
                         "user text NOT NULL,").__add__(
                         "machine text NOT NULL,").__add__(
-                        "model_name name NOT NULL,").__add__(
-                        "model_version name NOT NULL,").__add__(
-                        "checkpoint_status name NOT NULL,").__add__(
+                        "model_name text NOT NULL,").__add__(
+                        "model_version text NOT NULL,").__add__(
+                        "checkpoint_status text NOT NULL,").__add__(
                         "checkpoint_path text NOT NULL)")
                 self.__cursor.execute(query)
                 query = "CREATE TABLE IF NOT EXISTS model_info (".__add__(
@@ -77,6 +77,18 @@ class DBManager:
                         "track_duration real NOT NULL,").__add__(
                         "track_status text NOT NULL,").__add__(
                         "track_insert_datetime int NOT NULL)")
+                self.__cursor.execute(query)
+                query = "CREATE TABLE IF NOT EXISTS training_track (".__add__(
+                    "id integer PRIMARY KEY,").__add__(
+                    "model_name text NOT NULL,").__add__(
+                    "model_version text NOT NULL,").__add__(
+                    "start_checkpoint_id integer NOT NULL,").__add__(
+                    "end_checkpoint_id integer NOT NULL,").__add__(
+                    "audio_book_track_id integer NOT NULL,").__add__(
+                    "noise_id integer NOT NULL,").__add__(
+                    "epoch integer NOT NULL,").__add__(
+                    "status text NOT NULL,").__add__(
+                    "insert_datetime int NOT NULL)")
                 self.__cursor.execute(query)
                 self.__conn.commit()
                 self.__close()
@@ -223,6 +235,24 @@ class DBManager:
         except Exception as error:
             self.__close()
 
+    def modelTrainNext(self, name, ver):
+        try:
+            self.__connect()
+            query = "SELECT * ".__add__(
+                "FROM  training_track ").__add__(
+                "WHERE model_name ='" + name + "' ").__add__(
+                "AND model_version = '" + ver + "' ").__add__(
+                "AND status = 'NO TRAINED' ").__add__(
+                "ORDER BY insert_datetime ASC ").__add__(
+                "LIMIT 1"
+            )
+            self.__cursor.execute(query)
+            cursorVal = self.__cursor.fetchall()
+            self.__close()
+            return cursorVal
+        except Exception as error:
+            self.__close()
+
     def audioBookExist(self, name):
         try:
             self.__connect()
@@ -255,7 +285,7 @@ class DBManager:
                     "track_duration, track_status, track_insert_datetime) ").__add__(
                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))")
                 self.__cursor.execute(query, [int(newId[0][0]), track.dummy, track.title, track.authorName, track.url,
-                                              track.language, track.path, track.nTracks, track.name, track.channels,
+                                              track.language, track.zip, track.nTracks, track.name, track.path, track.channels,
                                               track.sampleRate, track.duration, "OK"])
             self.__conn.commit()
             self.__close()

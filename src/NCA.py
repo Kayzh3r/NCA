@@ -1,9 +1,10 @@
 import argparse
 import os
 import tempfile
-import imp
 
 from tensorflow import keras
+from pydub import AudioSegment, effects
+
 from src.DBManager import DBManager
 from src.NoiseManager import NoiseManager
 from src.AudioBooksManager import AudioBooksManager
@@ -23,11 +24,18 @@ class NCA:
         # Calling initialize method
         self.initialize()
 
+    def __importClass(self, name):
+        components = name.split('.')
+        mod = __import__(components[0])
+        for comp in components[1:]:
+            mod = getattr(mod, comp)
+        return mod
+
     def initialize(self):
         self.__modelLoad()
 
-    def __modelSave(self):
-        self.model.save()
+    def __modelSave(self, checkpointPath):
+        self.__model.save(checkpointPath)
 
     def __modelLoad(self):
         modelInfo = self.db.modelGetInfo(self.__modelName, self.__modelVer)
@@ -37,9 +45,10 @@ class NCA:
             self.__model = keras.models.load_model(modelInfo['checkpoint_path'])
 
     def __modelCreate(self):
-        self.__model = imp.load_source(self.__modelName, self.__modelPyFile)
+        classObj = self.__importClass(self.__modelPyFile)
+        self.__model = classObj()
         checkpointPath = self.__checkpointGetUniqueFileName(os.path.dirname(self.__modelPyFile))
-        self.__model.save(checkpointPath)
+        self.__modelSave(checkpointPath)
         self.db.modelCreate(self.__modelName, self.__modelVer, self.__modelPyFile, checkpointPath)
         return 0
 
@@ -51,8 +60,14 @@ class NCA:
         f.close()
         return checkpointPath
 
-    def train(self):
-        return 0
+    def train(self, time=0):
+        nextTrain = self.db.modelTrainNext(self.__modelName, self.__modelVer)
+        if not nextTrain:
+            self.db.modelTrainNewEpoch(self.__modelName, self.__modelVer)
+        combined_sounds = sound1 + sound2
+        rawsound = AudioSegment.from_file("./input.m4a", "m4a")
+        normalizedsound = effects.normalize(rawsound)
+        normalizedsound.export("./output.wav", format="wav")
 
     def predict(self):
         return 0

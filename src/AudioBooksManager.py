@@ -17,7 +17,7 @@ class AudioBooksManager:
     def __getBooks(self, language):
         self.__books[language] = self.__librivoxScraper.getBooksByLanguage(language)
 
-    def downloadData(self, dstPath='./downloads', sizeMB=0):
+    def downloadData(self, dstPath='./downloads', sizeMB=19990):
         downloadNow = False
         sizeMBDownloaded = 0
         if not os.path.exists(dstPath):
@@ -36,24 +36,31 @@ class AudioBooksManager:
                 bookFolder = os.path.join(dstPath, book.dummy)
                 if not os.path.exists(bookFolder):
                     os.mkdir(bookFolder)
+                print('Unzipping file ' + filename)
                 with zipfile.ZipFile(filename, 'r') as zipId:
                     fileList = zipId.namelist()
                     for file in fileList:
                         trackPath = os.path.join(bookFolder,file.title())
                         if not os.path.isfile(trackPath):
-                            zipId.extract(file.title(), trackPath)
+                            zipId.extract(file, bookFolder)
                 if downloadNow:
                     if self.db.audioBookExist(book.dummy):
                         self.db.audioBookUpdateStatusByName(book.dummy, 'DELETED')
                 if not (not downloadNow and self.db.audioBookExist(book.dummy)):
                     for trackFile in os.listdir(bookFolder):
-                        track = copy.deepcopy(book)
-                        with audioread.audio_open(trackFile) as fId:
+                        track = copy.copy(book)
+                        track.__class__ = Track
+                        track.name = trackFile
+                        track.path = os.path.join(bookFolder, trackFile)
+                        track.nTracks = len(os.listdir(bookFolder))
+                        track.zip = filename
+                        with audioread.audio_open(track.path) as fId:
                             track.channels   = fId.channels
                             track.sampleRate = fId.samplerate
                             track.duration   = fId.duration
                         trackList.append(track)
-                        self.db.audioBookCreate(trackList)
+                    self.db.audioBookCreate(trackList)
+                sizeMBDownloaded += os.path.getsize(filename)/(10**6)
                 if sizeMBDownloaded > sizeMB:
                     break
             if sizeMBDownloaded > sizeMB:
