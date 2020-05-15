@@ -63,12 +63,15 @@ class DBManager:
                 self.__cursor.execute(query)
                 query = "CREATE TABLE IF NOT EXISTS audio_books_tracks (".__add__(
                         "id integer PRIMARY KEY,").__add__(
+                        "book_dummy_name text NOT NULL,").__add__(
                         "book_name text NOT NULL,").__add__(
                         "book_author text NOT NULL,").__add__(
                         "book_url text NOT NULL,").__add__(
                         "book_language text NOT NULL,").__add__(
                         "book_path text NOT NULL,").__add__(
+                        "book_n_tracks int NOT NULL,").__add__(
                         "track_name text NOT NULL,").__add__(
+                        "track_path text NOT NULL,").__add__(
                         "track_channels int NOT NULL,").__add__(
                         "track_sample_rate int NOT NULL,").__add__(
                         "track_duration real NOT NULL,").__add__(
@@ -217,6 +220,90 @@ class DBManager:
                 retVal['checkpoint_path'] = cursorVal[0][7]
             self.__close()
             return retVal
+        except Exception as error:
+            self.__close()
+
+    def audioBookExist(self, name):
+        try:
+            self.__connect()
+            self.__cursor.execute(
+                "SELECT book_dummy_name " +
+                "FROM audio_books_tracks " +
+                "WHERE book_name = '" + name + "'"
+            )
+            cursorVal = self.__cursor.fetchall()
+            if not cursorVal:
+                retVal = False
+            else:
+                retVal = True
+            self.__close()
+            return retVal
+        except Exception as error:
+            self.__close()
+
+    def audioBookCreate(self, trackList):
+        try:
+            self.__connect()
+            for track in trackList:
+                self.__cursor.execute(
+                    "SELECT COALESCE(MAX(id) + 1,1) FROM audio_books_tracks"
+                )
+                newId = self.__cursor.fetchall()
+                query = "INSERT INTO audio_books_tracks ".__add__(
+                    "(id, book_dummy_name, book_name, book_author, book_url, book_language, book_path, ").__add__(
+                    "book_n_tracks, track_name, track_path, track_channels, track_sample_rate, ").__add__(
+                    "track_duration, track_status, track_insert_datetime) ").__add__(
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))")
+                self.__cursor.execute(query, [int(newId[0][0]), track.dummy, track.title, track.authorName, track.url,
+                                              track.language, track.path, track.nTracks, track.name, track.channels,
+                                              track.sampleRate, track.duration, "OK"])
+            self.__conn.commit()
+            self.__close()
+        except Exception as error:
+            self.__close()
+
+    def audioBookGetByName(self, name):
+        try:
+            self.__connect()
+            self.__cursor.execute(
+                "SELECT book_n_tracks FROM audio_books_tracks " +
+                "WHERE book_name = '" + name + "' " +
+                "ORDER BY track_insert_datetime DESC " +
+                "LIMIT 1"
+            )
+            nTracks = self.__cursor.fetchall()
+            self.__cursor.execute(
+                "SELECT * FROM audio_books_tracks " +
+                "WHERE book_name = '" + name + "' " +
+                "ORDER BY insert_datetime DESC " +
+                "LIMIT " + str(int(nTracks[0][0]))
+            )
+            retQuery = self.__cursor.fetchall()
+            self.__close()
+            return retQuery
+        except Exception as error:
+            self.__close()
+            return None
+
+    def audioBookUpdateStatusByName(self, name, status):
+        try:
+            self.__connect()
+            self.__cursor.execute(
+                "SELECT book_n_tracks FROM audio_books_tracks " +
+                "WHERE book_name = '" + name + "' " +
+                "ORDER BY track_insert_datetime DESC " +
+                "LIMIT 1"
+            )
+            nTracks = self.__cursor.fetchall()
+            query = "UPDATE audio_books_tracks ".__add__(
+                "SET status = '" + status + "' ").__add__(
+                "WHERE book_name = " + "'" + name + "' ").__add__(
+                "ORDER BY insert_datetime DESC ").__add__(
+                "LIMIT " + str(int(nTracks[0][0]))
+            )
+            self.__cursor.execute(query)
+            self.__conn.commit()
+            self.__close()
         except Exception as error:
             self.__close()
 

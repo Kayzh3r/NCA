@@ -15,12 +15,23 @@ class Book:
         self.state      = dataInfo['metadata']['state']
         self.type       = dataInfo['metadata']['type']
         self.language   = dataInfo['metadata']['language']
+        self.dummy      = ''
         if downloadInfo:
             self.url  = downloadInfo['url']
             self.size = downloadInfo['size']
         else:
             self.url  = ''
             self.size = ''
+
+
+class Track(Book):
+    def __init__(self, dataInfo, downloadInfo):
+        super().__init__(dataInfo, downloadInfo)
+        self.name = ''
+        self.channels = 0
+        self.sampleRate = 0
+        self.duration = 0
+        self.path = ''
 
 
 class LibrivoxScraper:

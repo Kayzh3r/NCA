@@ -1,7 +1,9 @@
 from src.DBManager import DBManager
-from src.LibrivoxScraper import LibrivoxScraper, Book
+from src.LibrivoxScraper import LibrivoxScraper, Track
 import audioread
 import os
+import zipfile
+import copy
 import re
 
 
@@ -23,20 +25,35 @@ class AudioBooksManager:
         for language in self.__languages:
             self.__getBooks(language)
             for book in self.__books[language]:
+                trackList = []
                 if book.url == '':
                     continue
                 filename = os.path.join(dstPath, os.path.basename(book.url))
+                book.dummy = os.path.splitext(os.path.basename(book.url))[0]
                 if not os.path.isfile(filename):
                     downloadNow = True
                     self.__librivoxScraper.downloadFile(url=book.url, filename=filename, downloadLib='requests')
-                '''if downloadNow:
-                    if self.db.noiseExist(key):
-                        self.db.noiseUpdateStatusByName(key, 'DELETED')
-                if not (not downloadNow and self.db.noiseExist(key)):
-                    with audioread.audio_open(filename) as fId:
-                        self.db.noiseCreate(key, self.resources[key],
-                                            filename, fId.channels,
-                                            fId.samplerate, fId.duration)'''
+                bookFolder = os.path.join(dstPath, book.dummy)
+                if not os.path.exists(bookFolder):
+                    os.mkdir(bookFolder)
+                with zipfile.ZipFile(filename, 'r') as zipId:
+                    fileList = zipId.namelist()
+                    for file in fileList:
+                        trackPath = os.path.join(bookFolder,file.title())
+                        if not os.path.isfile(trackPath):
+                            zipId.extract(file.title(), trackPath)
+                if downloadNow:
+                    if self.db.audioBookExist(book.dummy):
+                        self.db.audioBookUpdateStatusByName(book.dummy, 'DELETED')
+                if not (not downloadNow and self.db.audioBookExist(book.dummy)):
+                    for trackFile in os.listdir(bookFolder):
+                        track = copy.deepcopy(book)
+                        with audioread.audio_open(trackFile) as fId:
+                            track.channels   = fId.channels
+                            track.sampleRate = fId.samplerate
+                            track.duration   = fId.duration
+                        trackList.append(track)
+                        self.db.audioBookCreate(trackList)
                 if sizeMBDownloaded > sizeMB:
                     break
             if sizeMBDownloaded > sizeMB:
