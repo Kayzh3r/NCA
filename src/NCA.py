@@ -103,10 +103,6 @@ class NCA:
         noise = self.__db.noiseGetById(noiseId)
         noiseSound = self.__noise.loadNoise(noise[0][3], normalized=True)
         combinedSounds = trackSound + noiseSound
-        rawsound = AudioSegment.from_file("./input.m4a", "m4a")
-        normalizedsound = effects.normalize(rawsound)
-        normalizedsound.export("./output.wav", format="wav")
-        '''
 
     def predict(self, xPredict):
         return 0
