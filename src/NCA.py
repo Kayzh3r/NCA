@@ -31,9 +31,9 @@ logging.getLogger('').addHandler(console)
 class NCA:
     def __init__(self, modelName, modelVersion, modelPyFile=None):
         self.__chromeDriverPath = r"C:\Program Files (x86)\Google\ChromeDriver\chromedriver.exe"
-        self.db = DBManager()
-        self.__noise = NoiseManager(self.db)
-        self.__audioBooks = AudioBooksManager(self.db, self.__chromeDriverPath)
+        self.__db = DBManager()
+        self.__noise = NoiseManager(self.__db)
+        self.__audioBooks = AudioBooksManager(self.__db, self.__chromeDriverPath)
         self.__model = None
         self.__modelName = modelName
         self.__modelVer = modelVersion
@@ -57,7 +57,7 @@ class NCA:
         self.__model.__save(checkpointPath)
 
     def __modelLoad(self):
-        modelInfo = self.db.modelGetInfo(self.__modelName, self.__modelVer)
+        modelInfo = self.__db.modelGetInfo(self.__modelName, self.__modelVer)
         if modelInfo is None:
             logging.info('Requested model does not exist in data base')
             classObj = self.__importClass(self.__modelPyFile)
@@ -67,7 +67,7 @@ class NCA:
             self.__modelSave(checkpointPath)
             logging.info('Registering model ' + self.__modelName + self.__modelVer +
                          ' and initial checkpoint in data base')
-            self.db.modelCreate(self.__modelName, self.__modelVer, self.__modelPyFile, checkpointPath)
+            self.__db.modelCreate(self.__modelName, self.__modelVer, self.__modelPyFile, checkpointPath)
         else:
             self.__modelPyFile = modelInfo['path']
             logging.info('Requested model exists in data base and it is located in ' + self.__modelPyFile)
@@ -90,12 +90,19 @@ class NCA:
         logging.info('Downloading noise audios for training model')
         self.__noise.downloadData()
         logging.info('Retrieving next train combination')
-        nextTrain = self.db.modelTrainNext(self.__modelName, self.__modelVer)
+        nextTrain = self.__db.modelTrainNext(self.__modelName, self.__modelVer)
         if not nextTrain:
             logging.info('No combination retrieved. Creating new epoch training combination for model ' +
                          self.__modelVer + self.__modelVer)
-            self.db.modelTrainNewEpoch(self.__modelName, self.__modelVer)
-        '''combined_sounds = sound1 + sound2
+            self.__db.modelTrainNewEpoch(self.__modelName, self.__modelVer)
+            nextTrain = self.__db.modelTrainNext(self.__modelName, self.__modelVer)
+        trackId = nextTrain[0][5]
+        track = self.__db.audioBookGetById(trackId)
+        trackSound = self.__audioBooks.loadAudioBook(track[0][9], normalized=True)
+        noiseId = nextTrain[0][6]
+        noise = self.__db.noiseGetById(noiseId)
+        noiseSound = self.__noise.loadNoise(noise[0][3], normalized=True)
+        combinedSounds = trackSound + noiseSound
         rawsound = AudioSegment.from_file("./input.m4a", "m4a")
         normalizedsound = effects.normalize(rawsound)
         normalizedsound.export("./output.wav", format="wav")

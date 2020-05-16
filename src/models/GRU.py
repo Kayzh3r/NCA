@@ -1,5 +1,4 @@
 from tensorflow import keras
-from pydub import AudioSegment, effects
 
 
 class GRU:
@@ -17,4 +16,3 @@ class GRU:
 
     def train(self, xTrain, yTrain):
         pass
-        

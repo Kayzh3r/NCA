@@ -3,6 +3,7 @@ import copy
 import logging
 import os
 import zipfile
+from pydub import AudioSegment, effects
 
 from src.DBManager import DBManager
 from src.LibrivoxScraper import LibrivoxScraper, Track
@@ -105,6 +106,16 @@ class AudioBooksManager:
                     break
             if sizeMBDownloaded > sizeMB:
                 break
+
+    def loadAudioBook(self, path, normalized=True):
+        ext = os.path.splitext(path)[1][1:]
+        logger.info('Loading audio book ' + path + ' with file type ' + ext)
+        rawSound = AudioSegment.from_file(path, ext)
+        if normalized:
+            logger.info('Normalize noise')
+            return effects.normalize(rawSound)
+        else:
+            return rawSound
 
 
 if __name__ == '__main__':

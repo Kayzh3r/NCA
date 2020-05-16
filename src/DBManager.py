@@ -158,6 +158,22 @@ class DBManager:
             self.__close()
             return None
 
+    def noiseGetById(self, noiseId):
+        try:
+            self.__connect()
+            self.__cursor.execute(
+                "SELECT * FROM noise_files " +
+                "WHERE id = " + str(noiseId) + " " +
+                "ORDER BY insert_datetime DESC " +
+                "LIMIT 1"
+            )
+            retQuery = self.__cursor.fetchall()
+            self.__close()
+            return retQuery
+        except Exception as error:
+            self.__close()
+            return None
+
     def noiseUpdateStatusByName(self, name, status):
         try:
             self.__connect()
@@ -319,6 +335,22 @@ class DBManager:
                 "WHERE book_name = '" + name + "' " +
                 "ORDER BY insert_datetime DESC " +
                 "LIMIT " + str(int(nTracks[0][0]))
+            )
+            retQuery = self.__cursor.fetchall()
+            self.__close()
+            return retQuery
+        except Exception as error:
+            self.__close()
+            return None
+
+    def audioBookGetById(self, trackId):
+        try:
+            self.__connect()
+            self.__cursor.execute(
+                "SELECT * FROM audio_books_tracks " +
+                "WHERE id = " + str(trackId) + " " +
+                "ORDER BY insert_datetime DESC " +
+                "LIMIT 1"
             )
             retQuery = self.__cursor.fetchall()
             self.__close()
