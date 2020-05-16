@@ -1,10 +1,13 @@
-from src.DBManager import DBManager
-from src.LibrivoxScraper import LibrivoxScraper, Track
 import audioread
+import copy
+import logging
 import os
 import zipfile
-import copy
-import re
+
+from src.DBManager import DBManager
+from src.LibrivoxScraper import LibrivoxScraper, Track
+
+logger = logging.getLogger('AudioBooksManager')
 
 
 class AudioBooksManager:
@@ -17,13 +20,29 @@ class AudioBooksManager:
     def __getBooks(self, language):
         self.__books[language] = self.__librivoxScraper.getBooksByLanguage(language)
 
+    def __removeDuplicated(self, language=''):
+        urls = []
+        for book in self.__books[language]:
+            if book.url in urls:
+                logging.info('Book ' + book.title + ' already exist in url ' + book.url + '. Removing this book')
+                self.__books[language].remove(book)
+            else:
+                logging.info('Registering url ' + book.url)
+                urls.append(book.url)
+
     def downloadData(self, dstPath='./downloads', sizeMB=19990):
         downloadNow = False
         sizeMBDownloaded = 0
         if not os.path.exists(dstPath):
+            logger.info('Destination path does not exist. Create folder ' + dstPath)
             os.mkdir(dstPath)
+        else:
+            logger.info('Destination path already exists.')
         for language in self.__languages:
+            logger.info('Getting books for language ' + language)
             self.__getBooks(language)
+            logger.info('Removing books withing the same url')
+            self.__removeDuplicated(language=language)
             for book in self.__books[language]:
                 trackList = []
                 if book.url == '':
@@ -31,22 +50,33 @@ class AudioBooksManager:
                 filename = os.path.join(dstPath, os.path.basename(book.url))
                 book.dummy = os.path.splitext(os.path.basename(book.url))[0]
                 if not os.path.isfile(filename):
+                    logger.info('File ' + filename + ' does not exist. Downloading it')
                     downloadNow = True
                     self.__librivoxScraper.downloadFile(url=book.url, filename=filename, downloadLib='requests')
+                else:
+                    logger.info('File ' + filename + ' already exists')
                 bookFolder = os.path.join(dstPath, book.dummy)
                 if not os.path.exists(bookFolder):
+                    logger.info('Folder ' + bookFolder + ' does not exist. Creating it')
                     os.mkdir(bookFolder)
-                print('Unzipping file ' + filename)
+                else:
+                    logger.info('Folder ' + bookFolder + ' already exists')
                 with zipfile.ZipFile(filename, 'r') as zipId:
                     fileList = zipId.namelist()
                     for file in fileList:
-                        trackPath = os.path.join(bookFolder,file.title())
+                        trackPath = os.path.join(bookFolder, file.title())
                         if not os.path.isfile(trackPath):
+                            logger.info('Unzipping file ' + file.title())
                             zipId.extract(file, bookFolder)
+                        else:
+                            logger.info('File ' + file.title() + ' already exists do not unzip')
                 if downloadNow:
                     if self.db.audioBookExist(book.dummy):
+                        logger.info('Data base entree already exists and file just downloaded, updating status ' +
+                                    'for old register')
                         self.db.audioBookUpdateStatusByName(book.dummy, 'DELETED')
                 if not (not downloadNow and self.db.audioBookExist(book.dummy)):
+                    logger.info('Creating new data base entree for all tracks within file ' + bookFolder)
                     for trackFile in os.listdir(bookFolder):
                         track = copy.copy(book)
                         track.__class__ = Track
@@ -59,9 +89,19 @@ class AudioBooksManager:
                             track.sampleRate = fId.samplerate
                             track.duration   = fId.duration
                         trackList.append(track)
+                        logger.info('Found file ' + trackList + 'with:' +
+                                    '\n\tPath              ' + track.path +
+                                    '\n\tnTracks           ' + str(track.nTracks) +
+                                    '\n\tZip               ' + track.zip +
+                                    '\n\tChannels          ' + str(track.channels) +
+                                    '\n\tSample Rate [sps] ' + str(track.sampleRate) +
+                                    '\n\tDuration [secs]   ' + str(track.duration))
                     self.db.audioBookCreate(trackList)
                 sizeMBDownloaded += os.path.getsize(filename)/(10**6)
+                logger.info('Total size downloaded ' + str(sizeMBDownloaded) + 'MBytes')
                 if sizeMBDownloaded > sizeMB:
+                    logger.info('Total size downloaded ' + str(sizeMBDownloaded) +
+                                'MBytes exceeds requested target ' + sizeMB + 'MBytes')
                     break
             if sizeMBDownloaded > sizeMB:
                 break

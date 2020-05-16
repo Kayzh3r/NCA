@@ -1,3 +1,4 @@
+import logging
 import time
 import random
 import os
@@ -5,6 +6,8 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import requests
 from tqdm import tqdm
+
+logger = logging.getLogger('LibrivoxScrapper')
 
 
 class Book:
@@ -109,19 +112,19 @@ class LibrivoxScraper:
 
     def getBooksByLanguage(self, language):
         if self.__wrongInit:
-            print('Driver does not exist')
+            logger.error('Driver does not exist')
             return None
         self.__browser = webdriver.Chrome(self.__driverPath)
         if language not in self.__languages.keys():
-            print('Unknown requested language')
-            print('Known languages are:')
-            print(self.__languages.keys())
+            logger.error('Unknown requested language. Known languages are:\n' +
+                         '\tself.__languages.keys()')
             return None
         availablePage = True
         page = 1
         increaseSleep = 0
         lastPage = 0
         while availablePage:
+            logger.info('Retrieving information for language ' + language + ' and page ' + str(page))
             url = self.__mainURL + \
                   self.__primaryKey + str(self.__languages[language]) + \
                   self.__searchCategory + self.__categories['language'] + \
@@ -133,18 +136,27 @@ class LibrivoxScraper:
             results = soup.findAll('li', {'class': 'catalog-result'})
             lastPageNode = soup.findAll('a', {'class': 'page-number last'})
             if len(lastPageNode) == 0:
+                logger.debug('Enough time, waiting one second more')
                 increaseSleep += 1
                 continue
             else:
                 increaseSleep = 0
             if lastPage == 0:
                 lastPage = int(lastPageNode[0]['data-page_number'])
+                logger.info('Retrieved ' + str(lastPage) + ' pages for target language')
+            logger.info('Retrieved ' + str(len(results)) + ' books for page ' + str(page) +
+                        ' for ' + language + ' language')
             for result in results:
                 downloadInfo = self.__parseDownload(result)
                 dataInfo = self.__parseData(result)
                 if dataInfo:
                     if not self.__bookExists(dataInfo['title']):
-                        print('Get info for book ' + dataInfo['title'])
+                        if not downloadInfo:
+                            logger.warning('Retrieved information for book ' + dataInfo['title'] +
+                                           ' without download information')
+                        else:
+                            logger.info('Retrieved information for book ' + dataInfo['title'] +
+                                        ' located in ' + downloadInfo['url'])
                         self.__books.append(Book(dataInfo, downloadInfo))
             if page == lastPage:
                 availablePage = False
@@ -153,6 +165,8 @@ class LibrivoxScraper:
         return self.__books
 
     def downloadFile(self, url='', filename='', downloadLib='requests'):
+        logger.info('Downloading ' + url + ' file with ' + downloadLib + '.\n' +
+                    '\tStoring data in ' + filename)
         if downloadLib == 'selenium':
             chrome_options = webdriver.ChromeOptions()
             prefs = {'download.default_directory': filename}

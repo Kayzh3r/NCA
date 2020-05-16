@@ -1,7 +1,10 @@
+import logging
 import sqlite3
 import os
 from socket import gethostname
 from getpass import getuser
+
+logger = logging.getLogger('DBManager')
 
 
 class DBManager:
@@ -30,9 +33,12 @@ class DBManager:
     def createDB(self):
         try:
             if os.path.exists(self.__name):
+                logger.info('Data base already exists. Avoiding its creation')
                 self.__exists = True
             else:
+                logger.info('Connecting data base')
                 self.__connect()
+                logger.info('Creating table model_checkpoint')
                 query = "CREATE TABLE IF NOT EXISTS model_checkpoint (".__add__(
                         "id integer PRIMARY KEY,").__add__(
                         "datetime int NOT NULL,").__add__(
@@ -43,6 +49,7 @@ class DBManager:
                         "checkpoint_status text NOT NULL,").__add__(
                         "checkpoint_path text NOT NULL)")
                 self.__cursor.execute(query)
+                logger.info('Creating table model_info')
                 query = "CREATE TABLE IF NOT EXISTS model_info (".__add__(
                         "name text NOT NULL,").__add__(
                         "version text NOT NULL,").__add__(
@@ -50,6 +57,7 @@ class DBManager:
                         "path text NOT NULL,").__add__(
                         "CONSTRAINT pk_model_info PRIMARY KEY (name, version))")
                 self.__cursor.execute(query)
+                logger.info('Creating table noise_files')
                 query = "CREATE TABLE IF NOT EXISTS noise_files (".__add__(
                         "id integer PRIMARY KEY,").__add__(
                         "name text NOT NULL,").__add__(
@@ -61,6 +69,7 @@ class DBManager:
                         "status text NOT NULL,").__add__(
                         "insert_datetime int NOT NULL)")
                 self.__cursor.execute(query)
+                logger.info('Creating table audio_books_tracks')
                 query = "CREATE TABLE IF NOT EXISTS audio_books_tracks (".__add__(
                         "id integer PRIMARY KEY,").__add__(
                         "book_dummy_name text NOT NULL,").__add__(
@@ -78,6 +87,7 @@ class DBManager:
                         "track_status text NOT NULL,").__add__(
                         "track_insert_datetime int NOT NULL)")
                 self.__cursor.execute(query)
+                logger.info('Creating table training_track')
                 query = "CREATE TABLE IF NOT EXISTS training_track (".__add__(
                     "id integer PRIMARY KEY,").__add__(
                     "model_name text NOT NULL,").__add__(
@@ -90,7 +100,9 @@ class DBManager:
                     "status text NOT NULL,").__add__(
                     "insert_datetime int NOT NULL)")
                 self.__cursor.execute(query)
+                logger.info('Committing changes')
                 self.__conn.commit()
+                logger.info('Closing connection')
                 self.__close()
         except Exception:
             self.__close()
