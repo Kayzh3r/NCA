@@ -61,7 +61,7 @@ class NoiseManager():
                 with audioread.audio_open(filename) as fId:
                     logger.info('Creating new data base entree for noise file ' + filename + ' with:' +
                                 '\n\tChannels          ' + str(fId.channels) +
-                                '\n\tSample Rate [sps] ' + str(fId.sampleRate) +
+                                '\n\tSample Rate [sps] ' + str(fId.samplerate) +
                                 '\n\tDuration [secs]   ' + str(fId.duration))
                     self.db.noiseCreate(key, self.resources[key],
                                         filename, fId.channels,

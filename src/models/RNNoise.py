@@ -93,8 +93,10 @@ class RNNoise:
         self.__model.save(filename)
 
     def __prepateInput(self, input):
+        pass
 
     def __prepareOutput(self, output):
+        pass
 
     def train(self, xTrain, yTrain, voiceAvailable):
 
