@@ -49,7 +49,7 @@ class Adityatb:
     def __init__(self, checkpoint=None):
         self.batch_size = 32
         self.reg = 0.05
-        self.learning_rate
+        self.learning_rate = 1e-5
         self.n_units = 600
         self.decay = 1e-3
         self.input_sampling_rate = 11025
@@ -114,9 +114,10 @@ class Adityatb:
     def __prepareOutput(self, mod, phase):
         recons_stft = mod * np.exp(1j * phase)
         data_recovered = istft(recons_stft, fs=self.input_sampling_rate,
-                               window=get_window('hann', self.n_samples_window,
+                               window=get_window('hann', self.n_samples_window),
                                # nperseg=None,
-                               noverlap=int(self.overlap*self.n_samples_window), nfft=self.n_samples_window)
+                               noverlap=int(self.overlap*self.n_samples_window),
+                               nfft=self.n_samples_window)
         return data_recovered
 
     def train(self, dirtyAudio, cleanAudio, sampling_rate):

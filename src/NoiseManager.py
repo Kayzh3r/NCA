@@ -1,8 +1,8 @@
+from __future__ import unicode_literals
 import audioread
 import logging
 import os
 import youtube_dl
-from __future__ import unicode_literals
 from pydub import AudioSegment, effects
 
 from src.DBManager import DBManager

@@ -1,10 +1,8 @@
 import argparse
 import os
+import re
 import tempfile
 import logging
-
-from tensorflow import keras
-from pydub import AudioSegment, effects
 
 from src.DBManager import DBManager
 from src.NoiseManager import NoiseManager
@@ -42,11 +40,10 @@ class NCA:
         # Calling initialize method
         self.initialize()
 
-    def __importClass(self, name):
-        components = name.split('.')
-        mod = __import__(components[0])
-        for comp in components[1:]:
-            mod = getattr(mod, comp)
+    def __importClass(self, py_file_path, class_name):
+        module = '.'.join(list(filter(None, re.split(r'\\+|/|\./|\.\\+', os.path.splitext(py_file_path)[0]))))
+        mod = __import__(module, fromlist=['object'])
+        mod = getattr(mod, class_name)
         return mod
 
     def initialize(self):
@@ -60,7 +57,7 @@ class NCA:
         modelInfo = self.__db.modelGetInfo(self.__modelName, self.__modelVer)
         if modelInfo is None:
             logging.info('Requested model does not exist in data base')
-            classObj = self.__importClass(self.__modelPyFile)
+            classObj = self.__importClass(self.__modelPyFile, self.__modelName)
             self.__model = classObj()
             checkpointPath = self.__checkpointGetUniqueFileName(os.path.dirname(self.__modelPyFile))
             logging.info('Creating initial model checkpoint ' + checkpointPath)
@@ -71,7 +68,7 @@ class NCA:
         else:
             self.__modelPyFile = modelInfo['path']
             logging.info('Requested model exists in data base and it is located in ' + self.__modelPyFile)
-            classObj = self.__importClass(self.__modelPyFile)
+            classObj = self.__importClass(self.__modelPyFile, self.__modelName)
             logging.info('Loading checkpoint ' + modelInfo['checkpoint_path'] +
                          'for model ' + self.__modelName + self.__modelVer)
             self.__model = classObj(modelInfo['checkpoint_path'])
