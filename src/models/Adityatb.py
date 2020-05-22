@@ -3,6 +3,7 @@ import logging
 import numpy as np
 from scipy.signal import decimate
 from scipy.signal import spectrogram
+from scipy.signal import istft
 from scipy.signal import get_window
 from librosa.core import amplitude_to_db
 from tensorflow import keras
@@ -53,8 +54,8 @@ class Adityatb:
         self.decay = 1e-3
         self.input_sampling_rate = 11025
         self.n_samples_window = 1024
+        self.n_samples_spectrum = int(1024/2) + 1
         self.overlap = 0.5
-        self.
         if checkpoint:
             logger.info('Model checkpoint input obtained')
             self.__model = keras.models.load_model(checkpoint)
@@ -64,17 +65,18 @@ class Adityatb:
 
     def __createModel(self):
         regularizer = l2(self.reg)
-        input = Input(shape=shape)
-        hid1 = LSTM(self.n_units, return_sequences=True, activation='relu')(input)
+        input_layer = Input(shape=self.n_samples_spectrum)
+        hid1 = LSTM(self.n_units, return_sequences=True, activation='relu')(input_layer)
         dp1 = Dropout(0.2)(hid1)
         hid2 = LSTM(self.n_units, return_sequences=True, activation='relu')(dp1)
         dp2 = Dropout(0.2)(hid2)
         hid3 = LSTM(self.n_units, return_sequences=True, activation='relu')(dp2)
-        y1_hat = TimeDistributed(Dense(train_x.shape[2], activation='softmax', input_shape=train_x.shape[1:]),
+        y1_hat = TimeDistributed(Dense(self.n_samples_spectrum, activation='softmax', input_shape=input_layer),
                                  name='y1_hat')(hid3)
-        out1 = Lambda(soft_masking, masked_out_shape, name='softMask')([input, y1_hat])
+        out_layer = Lambda(soft_masking,
+                           output_shape=masked_out_shape, name='softMask')([input_layer, y1_hat])
 
-        self.__model = Model(inputs=input, outputs=out1)
+        self.__model = Model(inputs=input_layer, outputs=out_layer)
         self.__model.summary()
 
         opt = Adam(lr=self.learning_rate, decay=self.decay)
@@ -92,28 +94,41 @@ class Adityatb:
                     '\rInput sampling rate: ' + str(input_sampling_rate) + '\n' +
                     '\rModel sampling rate: ' + str(self.input_sampling_rate) + '\n' +
                     'Resampling input signal by factor: ' + str(factor))
-        in_signal = decimate(input, factor)
+        in_signal = decimate(input_signal, factor)
         return in_signal
 
     def __prepateInput(self, input_signal, sampling_rate):
         if sampling_rate != self.input_sampling_rate:
             input_signal = self.__resample(input_signal, sampling_rate)
         freq, time, stft = spectrogram(
-            input_signal, fs=int(),
+            input_signal, fs=self.input_sampling_rate,
             window=get_window('hann', self.n_samples_window),
             # nperseg=None,
             noverlap=int(self.overlap*self.n_samples_window), nfft=self.n_samples_window,
             # detrend='constant',
             return_onesided=True, scaling='spectrum', axis=-1, mode='complex')
         db_values = amplitude_to_db(np.abs(stft))
-        return db_values
+        phase = np.angle(stft)
+        return [freq, time, db_values, phase]
 
-    def __prepareOutput(self, output):
-        pass
+    def __prepareOutput(self, mod, phase):
+        recons_stft = mod * np.exp(1j * phase)
+        data_recovered = istft(recons_stft, fs=self.input_sampling_rate,
+                               window=get_window('hann', self.n_samples_window,
+                               # nperseg=None,
+                               noverlap=int(self.overlap*self.n_samples_window), nfft=self.n_samples_window)
+        return data_recovered
 
-    def train(self, xTrain, yTrain, sampling_rate):
-
-        self.__model.fit(xTrain, yTrain,
+    def train(self, dirtyAudio, cleanAudio, sampling_rate):
+        _, _, db_values_dirty, _ = self.__prepateInput(dirtyAudio, sampling_rate)
+        _, _, db_values_clean, _ = self.__prepateInput(cleanAudio, sampling_rate)
+        self.__model.fit(db_values_dirty, db_values_dirty,
                          batch_size=self.batch_size,
                          epochs=1,
                          validation_split=0.1)
+
+    def predict(self, dirtyAudio, sampling_rate):
+        _, _, db_values_dirty, phase = self.__prepateInput(dirtyAudio, sampling_rate)
+        clean_mod = self.__model.predict(db_values_dirty)
+        clean_audio = self.__prepareOutput(clean_mod,phase)
+        return clean_audio

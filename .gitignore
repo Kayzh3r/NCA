@@ -132,3 +132,13 @@ dmypy.json
 ./src/download
 # Database
 *.db
+
+# Bibliography folder
+bibliography/*
+
+# Premiere files
+Adobe\ Premiere\ Pro\ Auto-Save/*
+audio_processing.prproj
+
+# .idea folder
+.idea/*
