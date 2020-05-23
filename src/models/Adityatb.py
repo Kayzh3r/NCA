@@ -65,26 +65,32 @@ class Adityatb:
 
     def __createModel(self):
         regularizer = l2(self.reg)
-        input_layer = Input(shape=self.n_samples_spectrum)
+        input_layer = Input(shape=[1,self.n_samples_spectrum])
         hid1 = LSTM(self.n_units, return_sequences=True, activation='relu')(input_layer)
         dp1 = Dropout(0.2)(hid1)
         hid2 = LSTM(self.n_units, return_sequences=True, activation='relu')(dp1)
         dp2 = Dropout(0.2)(hid2)
         hid3 = LSTM(self.n_units, return_sequences=True, activation='relu')(dp2)
-        y1_hat = TimeDistributed(Dense(self.n_samples_spectrum, activation='softmax', input_shape=input_layer),
-                                 name='y1_hat')(hid3)
-        out_layer = Lambda(soft_masking,
-                           output_shape=masked_out_shape, name='softMask')([input_layer, y1_hat])
+        y1_hat = TimeDistributed(Dense(self.n_samples_spectrum, activation='softmax',
+                                       input_shape=[1,self.n_samples_spectrum]),
+                                       name='y1_hat')(hid3)
+        out_layer = Dense(self.n_samples_spectrum, activation='softmax',
+                           name='softMask')(y1_hat)
+        #out_layer = Lambda(soft_masking, output_shape=masked_out_shape,
+        #                   name='softMask')([input_layer, y1_hat])
 
         self.__model = Model(inputs=input_layer, outputs=out_layer)
-        self.__model.summary()
+        model_info = []
+        self.__model.summary(print_fn=lambda x: model_info.append(x))
+        model_info = '\n\t'.join(model_info)
+        logger.info(model_info)
 
         opt = Adam(lr=self.learning_rate, decay=self.decay)
         self.__model.compile(loss='kullback_leibler_divergence',
                              optimizer=opt,
                              metrics=['acc', 'mse'])
 
-    def __save(self, filename):
+    def save(self, filename):
         logger.info('Save model to file ' + filename)
         self.__model.save(filename)
 
