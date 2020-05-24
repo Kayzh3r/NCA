@@ -1,4 +1,5 @@
-AMD GPU
+AMD GPU ROCM
+    https://www.videogames.ai/Install-ROCM-Machine-Learning-AMD-GPU
 	https://towardsdatascience.com/train-neural-networks-using-amd-gpus-and-keras-37189c453878
 	https://www.petelawson.com/post/using-an-amd-gpu-in-keras/
 MKL in AMD:

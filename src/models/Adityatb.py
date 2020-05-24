@@ -58,7 +58,7 @@ class Adityatb:
         self.overlap = 0.5
         if checkpoint:
             logger.info('Model checkpoint input obtained')
-            self.__model = keras.models.load_model(checkpoint)
+            self.__model = keras.models.load_model(checkpoint.replace('\\', '/'))
         else:
             logger.info('Creating new model')
             self.__createModel()

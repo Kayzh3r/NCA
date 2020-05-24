@@ -10,26 +10,9 @@ from src.AudioBooksManager import AudioBooksManager
 from src.errors import InitializationError
 
 
-# set up logging to file
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(name)-16s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M',
-                    filename='./NCA.log',
-                    filemode='a+')
-# define a Handler which writes DEBUG messages or higher to the sys.stderr
-console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
-# set a format which is simpler for console use
-formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-# tell the handler to use this format
-console.setFormatter(formatter)
-# add the handler to the root logger
-logging.getLogger('').addHandler(console)
-
-
 class NCA:
     def __init__(self, modelName, modelVersion, modelPyFile=None):
-        self.__chromeDriverPath = r"C:\Program Files (x86)\Google\ChromeDriver\chromedriver.exe"
+        self.__chromeDriverPath = r"resources/chromedriver"
         self.__checkpoint_folder = r'checkpoint'
         self.__db = DBManager()
         self.__noise = NoiseManager(self.__db)
@@ -122,6 +105,22 @@ class NCA:
 
 if __name__ == "__main__":
     try:
+        # set up logging to file
+        logging.basicConfig(level=logging.DEBUG,
+                            format='%(asctime)s %(name)-20s %(levelname)-8s %(message)s',
+                            datefmt='%m-%d %H:%M',
+                            filename='./NCA.log',
+                            filemode='a+')
+        # define a Handler which writes DEBUG messages or higher to the sys.stderr
+        console = logging.StreamHandler()
+        console.setLevel(logging.DEBUG)
+        # set a format which is simpler for console use
+        formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+        # tell the handler to use this format
+        console.setFormatter(formatter)
+        # add the handler to the root logger
+        logging.getLogger('').addHandler(console)
+
         logging.info('Starting program execution')
         parser = argparse.ArgumentParser()
         parser.add_argument("model", help="model name for working with", type=str)
