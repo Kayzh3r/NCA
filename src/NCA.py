@@ -7,6 +7,7 @@ import logging
 from src.DBManager import DBManager
 from src.NoiseManager import NoiseManager
 from src.AudioBooksManager import AudioBooksManager
+from src.errors import InitializationError
 
 
 # set up logging to file
@@ -48,34 +49,45 @@ class NCA:
         return mod
 
     def initialize(self):
-        if not os.path.exists(self.__checkpoint_folder):
-            logging.info('Checkpoint path ' + self.__checkpoint_folder + ' does not exist. Create folder')
-            os.mkdir(self.__checkpoint_folder)
-        logging.info('Loading model ' + self.__modelName + self.__modelVer)
-        self.__modelLoad()
+        try:
+            if not os.path.exists(self.__checkpoint_folder):
+                logging.info('Checkpoint path ' + self.__checkpoint_folder + ' does not exist. Create folder')
+                os.mkdir(self.__checkpoint_folder)
+            logging.info('Loading model ' + self.__modelName + self.__modelVer)
+            self.__modelLoad()
+        except Exception as e:
+            logging.error(str(e), exc_info=True)
+            raise
 
     def __modelSave(self, checkpointPath):
         self.__model.save(checkpointPath)
 
     def __modelLoad(self):
-        modelInfo = self.__db.modelGetInfo(self.__modelName, self.__modelVer)
-        if modelInfo is None:
-            logging.info('Requested model does not exist in data base')
-            classObj = self.__importClass(self.__modelPyFile, self.__modelName)
-            self.__model = classObj()
-            checkpointPath = self.__checkpointGetUniqueFileName()
-            logging.info('Creating initial model checkpoint ' + checkpointPath)
-            self.__modelSave(checkpointPath)
-            logging.info('Registering model ' + self.__modelName + self.__modelVer +
-                         ' and initial checkpoint in data base')
-            self.__db.modelCreate(self.__modelName, self.__modelVer, self.__modelPyFile, checkpointPath)
-        else:
-            self.__modelPyFile = modelInfo['path']
-            logging.info('Requested model exists in data base and it is located in ' + self.__modelPyFile)
-            classObj = self.__importClass(self.__modelPyFile, self.__modelName)
-            logging.info('Loading checkpoint ' + modelInfo['checkpoint_path'] +
-                         'for model ' + self.__modelName + self.__modelVer)
-            self.__model = classObj(modelInfo['checkpoint_path'])
+        try:
+            modelInfo = self.__db.modelGetInfo(self.__modelName, self.__modelVer)
+            if modelInfo is None:
+                logging.info('Requested model does not exist in data base')
+                if not self.__modelPyFile:
+                    raise InitializationError('Model does not exists and path is not given.\n' +
+                                              '\rYou must create model before')
+                classObj = self.__importClass(self.__modelPyFile, self.__modelName)
+                self.__model = classObj()
+                checkpointPath = self.__checkpointGetUniqueFileName()
+                logging.info('Creating initial model checkpoint ' + checkpointPath)
+                self.__modelSave(checkpointPath)
+                logging.info('Registering model ' + self.__modelName + self.__modelVer +
+                             ' and initial checkpoint in data base')
+                self.__db.modelCreate(self.__modelName, self.__modelVer, self.__modelPyFile, checkpointPath)
+            else:
+                self.__modelPyFile = modelInfo['path']
+                logging.info('Requested model exists in data base and it is located in ' + self.__modelPyFile)
+                classObj = self.__importClass(self.__modelPyFile, self.__modelName)
+                logging.info('Loading checkpoint ' + modelInfo['checkpoint_path'] +
+                             'for model ' + self.__modelName + self.__modelVer)
+                self.__model = classObj(modelInfo['checkpoint_path'])
+        except Exception as e:
+            logging.error(str(e), exc_info=True)
+            raise
 
     def __checkpointGetUniqueFileName(self):
         checkpointPath = os.path.join(self.__checkpoint_folder,
@@ -109,12 +121,19 @@ class NCA:
 
 
 if __name__ == "__main__":
-    logging.info('Starting program execution')
-    parser = argparse.ArgumentParser()
-    parser.add_argument("model", help="model name for working with", type=str)
-    parser.add_argument("ver", help="version of the model", type=str)
-    parser.add_argument("-t", "--train", help="train time in minutes", type=int)
-    parser.add_argument("-p", "--predict", help="predict input file", type=str)
-    parser.add_argument("-c", "--create", help="create new model from python file", type=str)
-    args = parser.parse_args()
-    nca = NCA(args.model, args.ver, args.create)
+    try:
+        logging.info('Starting program execution')
+        parser = argparse.ArgumentParser()
+        parser.add_argument("model", help="model name for working with", type=str)
+        parser.add_argument("ver", help="version of the model", type=str)
+        parser.add_argument("-t", "--train", help="train time in minutes", type=int)
+        parser.add_argument("-p", "--predict", help="predict input file", type=str)
+        parser.add_argument("-c", "--create", help="create new model from python file", type=str)
+        args = parser.parse_args()
+        nca = NCA(args.model, args.ver, args.create)
+        if args.train:
+            nca.train(args.train)
+        if args.predict:
+            output = nca.predict(args.predict)
+    except Exception as e:
+        logging.error('Something was wrong', exc_info=True)

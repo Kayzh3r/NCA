@@ -1,0 +1,8 @@
+AMD GPU
+	https://towardsdatascience.com/train-neural-networks-using-amd-gpus-and-keras-37189c453878
+	https://www.petelawson.com/post/using-an-amd-gpu-in-keras/
+MKL in AMD:
+	https://www.pugetsystems.com/labs/hpc/How-To-Use-MKL-with-AMD-Ryzen-and-Threadripper-CPU-s-Effectively-for-Python-Numpy-And-Other-Applications-1637/
+	
+TensorFlow CPUs and GPUs configuration:
+	https://medium.com/@liyin2015/tensorflow-cpus-and-gpus-configuration-9c223436d4ef

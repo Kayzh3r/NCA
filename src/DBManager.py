@@ -249,11 +249,11 @@ class DBManager:
                           'status'  : cursorVal[0][2],
                           'path'    : cursorVal[0][3]}
                 query = "SELECT * ".__add__(
-                        "FROM training_execution ").__add__(
-                        "WHERE name ='" + name + "' ").__add__(
-                        "AND version ='" + ver + "' ").__add__(
-                        "ORDER BY insert_datetime DESC ").__add__(
-                        "LIMIT 1)")
+                        "FROM model_checkpoint ").__add__(
+                        "WHERE model_name ='" + name + "' ").__add__(
+                        "AND model_version ='" + ver + "' ").__add__(
+                        "ORDER BY datetime DESC ").__add__(
+                        "LIMIT 1")
                 self.__cursor.execute(query)
                 cursorVal = self.__cursor.fetchall()
                 retVal['checkpoint_status'] = cursorVal[0][6]
