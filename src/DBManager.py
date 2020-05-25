@@ -281,6 +281,17 @@ class DBManager:
         except Exception as error:
             self.__close()
 
+    def modelTrainNewEpoch(self, name, ver):
+        try:
+            self.__cursor.execute(
+                "SELECT COALESCE(MAX(epoch) + 1,1) FROM training_track " +
+                "WHERE model_name = '" + name + "' " +
+                "AND model_version = '" + ver + "' "
+            )
+            newEpoch = self.__cursor.fetchall()[0][0]
+        except Exception as error:
+            self.__close()
+
     def audioBookExist(self, name):
         try:
             self.__connect()

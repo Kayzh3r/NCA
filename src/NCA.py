@@ -79,16 +79,17 @@ class NCA:
                                       next(tempfile._get_candidate_names()) + '.h5')
         return checkpointPath
 
-    def train(self, time=0):
-        logging.info('Downloading audio books for training model')
-        self.__audioBooks.downloadData()
-        logging.info('Downloading noise audios for training model')
-        self.__noise.downloadData()
+    def train(self, time=0, download=0):
+        if download:
+            logging.info('Downloading audio books for training model')
+            self.__audioBooks.downloadData()
+            logging.info('Downloading noise audios for training model')
+            self.__noise.downloadData()
         logging.info('Retrieving next train combination')
         nextTrain = self.__db.modelTrainNext(self.__modelName, self.__modelVer)
         if not nextTrain:
             logging.info('No combination retrieved. Creating new epoch training combination for model ' +
-                         self.__modelVer + self.__modelVer)
+                         self.__modelName + self.__modelVer)
             self.__db.modelTrainNewEpoch(self.__modelName, self.__modelVer)
             nextTrain = self.__db.modelTrainNext(self.__modelName, self.__modelVer)
         trackId = nextTrain[0][5]
@@ -115,7 +116,7 @@ if __name__ == "__main__":
         console = logging.StreamHandler()
         console.setLevel(logging.DEBUG)
         # set a format which is simpler for console use
-        formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+        formatter = logging.Formatter('%(asctime)s %(name)-20s %(levelname)-8s %(message)s')
         # tell the handler to use this format
         console.setFormatter(formatter)
         # add the handler to the root logger
@@ -128,10 +129,11 @@ if __name__ == "__main__":
         parser.add_argument("-t", "--train", help="train time in minutes", type=int)
         parser.add_argument("-p", "--predict", help="predict input file", type=str)
         parser.add_argument("-c", "--create", help="create new model from python file", type=str)
+        parser.add_argument("-d", "--download", action='count', help="Download data and log into database", default=0)
         args = parser.parse_args()
         nca = NCA(args.model, args.ver, args.create)
         if args.train:
-            nca.train(args.train)
+            nca.train(args.train, args.download)
         if args.predict:
             output = nca.predict(args.predict)
     except Exception as e:

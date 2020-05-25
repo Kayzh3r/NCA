@@ -104,10 +104,10 @@ class AudioBooksManager:
                                         '\n\tDuration [secs]   ' + str(track.duration))
                         self.db.audioBookCreate(trackList)
                     sizeMBDownloaded += os.path.getsize(filename)/(10**6)
-                    logger.info('Total size downloaded ' + str(sizeMBDownloaded) + 'MBytes')
+                    logger.info('Total size downloaded %.3f MBytes' % (sizeMBDownloaded))
                     if sizeMBDownloaded > sizeMB:
-                        logger.info('Total size downloaded ' + str(sizeMBDownloaded) +
-                                    'MBytes exceeds requested target ' + sizeMB + 'MBytes')
+                        logger.info('Total size downloaded %.3f MBytes exceeds requested target %.3f MBytes' %
+                                    (sizeMBDownloaded, sizeMB))
                         break
                 if sizeMBDownloaded > sizeMB:
                     break
