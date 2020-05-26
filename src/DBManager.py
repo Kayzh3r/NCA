@@ -283,12 +283,25 @@ class DBManager:
 
     def modelTrainNewEpoch(self, name, ver):
         try:
+            self.__connect()
             self.__cursor.execute(
                 "SELECT COALESCE(MAX(epoch) + 1,1) FROM training_track " +
                 "WHERE model_name = '" + name + "' " +
                 "AND model_version = '" + ver + "' "
             )
             newEpoch = self.__cursor.fetchall()[0][0]
+            query = "SELECT '" + name +"' as model_name,".__add__(
+                    "'" + ver + "' as model_ver,").__add__(
+                    str(start_checkpoint_id) + " as start_checkpoint_id,").__add__(
+                    str(-1) + " as end_checkpoint_id,").__add__(
+                    "tracks.id as audio_book_track_id," ).__add__(
+                    "noise.id as noise_id,").__add__(
+                    str(newEpoch) + " as epoch,").__add__(
+                    "'NO TRAINED' as status,").__add__(
+                    "datetime('now') as insert_datetime ").__add__(
+                    "FROM audio_books_tracks AS tracks ").__add__(
+                    "JOIN noise_files AS noise")
+            self.__close()
         except Exception as error:
             self.__close()
 
