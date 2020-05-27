@@ -80,25 +80,30 @@ class NCA:
         return checkpointPath
 
     def train(self, time=0, download=0):
-        if download:
-            logging.info('Downloading audio books for training model')
-            self.__audioBooks.downloadData()
-            logging.info('Downloading noise audios for training model')
-            self.__noise.downloadData()
-        logging.info('Retrieving next train combination')
-        nextTrain = self.__db.modelTrainNext(self.__modelName, self.__modelVer)
-        if not nextTrain:
-            logging.info('No combination retrieved. Creating new epoch training combination for model ' +
-                         self.__modelName + self.__modelVer)
-            self.__db.modelTrainNewEpoch(self.__modelName, self.__modelVer)
+        try:
+            if download:
+                logging.info('Downloading audio books for training model')
+                self.__audioBooks.downloadData()
+                logging.info('Downloading noise audios for training model')
+                self.__noise.downloadData()
+            logging.info('Retrieving next train combination')
             nextTrain = self.__db.modelTrainNext(self.__modelName, self.__modelVer)
-        trackId = nextTrain[0][5]
-        track = self.__db.audioBookGetById(trackId)
-        trackSound = self.__audioBooks.loadAudioBook(track[0][9], normalized=True)
-        noiseId = nextTrain[0][6]
-        noise = self.__db.noiseGetById(noiseId)
-        noiseSound = self.__noise.loadNoise(noise[0][3], normalized=True)
-        combinedSounds = trackSound + noiseSound
+            if not nextTrain:
+                logging.info('No combination retrieved. Creating new epoch training combination for model ' +
+                             self.__modelName + self.__modelVer)
+                self.__db.modelTrainNewEpoch(self.__modelName, self.__modelVer)
+                nextTrain = self.__db.modelTrainNext(self.__modelName, self.__modelVer)
+            trackId = nextTrain[0][5]
+            track = self.__db.audioBookGetById(trackId)
+            trackSound = self.__audioBooks.loadAudioBook(track[0][9], normalized=False)
+            noiseId = nextTrain[0][6]
+            noise = self.__db.noiseGetById(noiseId)
+            noiseSound = self.__noise.loadNoise(noise[0][3], normalized=False)
+            combinedSounds = trackSound + noiseSound
+
+        except Exception as e:
+            logging.error(str(e), exc_info=True)
+            raise
 
     def predict(self, xPredict):
         return 0

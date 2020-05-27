@@ -124,6 +124,8 @@ class DBManager:
             return retVal
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def noiseCreate(self, name, url, path, channels, sampleRate, duration):
         try:
@@ -141,6 +143,8 @@ class DBManager:
             self.__close()
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def noiseGetByName(self, name):
         try:
@@ -156,7 +160,8 @@ class DBManager:
             return retQuery
         except Exception as error:
             self.__close()
-            return None
+            logging.error(str(error), exc_info=True)
+            raise
 
     def noiseGetById(self, noiseId):
         try:
@@ -172,7 +177,8 @@ class DBManager:
             return retQuery
         except Exception as error:
             self.__close()
-            return None
+            logging.error(str(error), exc_info=True)
+            raise
 
     def noiseUpdateStatusByName(self, name, status):
         try:
@@ -191,6 +197,8 @@ class DBManager:
             self.__close()
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def modelExist(self, name):
         try:
@@ -209,6 +217,8 @@ class DBManager:
             return retVal
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def modelCreate(self, name, version, pyFilePath, checkpointPath):
         try:
@@ -231,6 +241,8 @@ class DBManager:
             self.__close()
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def modelGetInfo(self, name, ver):
         try:
@@ -262,6 +274,8 @@ class DBManager:
             return retVal
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def modelTrainNext(self, name, ver):
         try:
@@ -271,7 +285,7 @@ class DBManager:
                 "WHERE model_name ='" + name + "' ").__add__(
                 "AND model_version = '" + ver + "' ").__add__(
                 "AND status = 'NO TRAINED' ").__add__(
-                "ORDER BY insert_datetime ASC ").__add__(
+                "ORDER BY id ASC ").__add__(
                 "LIMIT 1"
             )
             self.__cursor.execute(query)
@@ -280,6 +294,8 @@ class DBManager:
             return cursorVal
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def modelTrainNewEpoch(self, name, ver):
         try:
@@ -290,7 +306,16 @@ class DBManager:
                 "AND model_version = '" + ver + "' "
             )
             newEpoch = self.__cursor.fetchall()[0][0]
-            query = "SELECT '" + name +"' as model_name,".__add__(
+            self.__cursor.execute(
+                "SELECT MAX(id) FROM model_checkpoint " +
+                "WHERE model_name = '" + name + "' " +
+                "AND model_version = '" + ver + "' "
+            )
+            start_checkpoint_id = self.__cursor.fetchall()[0][0]
+            query = "INSERT INTO training_track ".__add__(
+                    "SELECT ROW_NUMBER() OVER ( ORDER BY tracks.id, noise.id ) + ").__add__(
+                    str(int(newEpoch - 1)) + " AS id,").__add__(
+                    "'" + name + "' as model_name,").__add__(
                     "'" + ver + "' as model_ver,").__add__(
                     str(start_checkpoint_id) + " as start_checkpoint_id,").__add__(
                     str(-1) + " as end_checkpoint_id,").__add__(
@@ -300,10 +325,15 @@ class DBManager:
                     "'NO TRAINED' as status,").__add__(
                     "datetime('now') as insert_datetime ").__add__(
                     "FROM audio_books_tracks AS tracks ").__add__(
-                    "JOIN noise_files AS noise")
+                    "JOIN noise_files AS noise ").__add__(
+                    "ON 1=1")
+            self.__cursor.execute(query)
+            self.__conn.commit()
             self.__close()
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def audioBookExist(self, name):
         try:
@@ -322,6 +352,8 @@ class DBManager:
             return retVal
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def audioBookCreate(self, trackList):
         try:
@@ -343,6 +375,8 @@ class DBManager:
             self.__close()
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
     def audioBookGetByName(self, name):
         try:
@@ -373,7 +407,7 @@ class DBManager:
             self.__cursor.execute(
                 "SELECT * FROM audio_books_tracks " +
                 "WHERE id = " + str(trackId) + " " +
-                "ORDER BY insert_datetime DESC " +
+                "ORDER BY track_insert_datetime DESC " +
                 "LIMIT 1"
             )
             retQuery = self.__cursor.fetchall()
@@ -381,7 +415,8 @@ class DBManager:
             return retQuery
         except Exception as error:
             self.__close()
-            return None
+            logging.error(str(error), exc_info=True)
+            raise
 
     def audioBookUpdateStatusByName(self, name, status):
         try:
@@ -404,6 +439,8 @@ class DBManager:
             self.__close()
         except Exception as error:
             self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
 
 
 if __name__ == '__main__':
