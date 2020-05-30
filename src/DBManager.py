@@ -348,6 +348,26 @@ class DBManager:
             logging.error(str(error), exc_info=True)
             raise
 
+    def modelTrainGetCombination(self, target_sample_rate):
+        try:
+            self.__connect()
+            query = "SELECT ROW_NUMBER() OVER ( ORDER BY tracks.id, noise.id ), ".__add__(
+                    "tracks.id as audio_book_track_id,").__add__(
+                    "noise.id as noise_id ").__add__(
+                    "FROM audio_books_tracks AS tracks ").__add__(
+                    "JOIN noise_files AS noise ").__add__(
+                    "ON 1=1 ").__add__(
+                    r"WHERE (tracks.track_sample_rate%" + "%d) = 0 " % target_sample_rate).__add__(
+                    r"AND (noise.sample_rate%" + "%d) = 0" % target_sample_rate)
+            self.__cursor.execute(query)
+            ret_val = self.__cursor.fetchall()
+            self.__close()
+            return ret_val
+        except Exception as error:
+            self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
+
     def modelTrainUpdateStatus(self, id_training_track, status):
         try:
             self.__connect()
