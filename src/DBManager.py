@@ -227,6 +227,17 @@ class DBManager:
                     "(name, version, status, path) ").__add__(
                     "VALUES (?,?,?,?)")
             self.__cursor.execute(query, [name, version, "CREATED", pyFilePath])
+            self.__conn.commit()
+            self.__close()
+            self.modelCreateCheckpoint(name, version, checkpointPath, "CREATED")
+        except Exception as error:
+            self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
+
+    def modelCreateCheckpoint(self, name, version, checkpointPath, checkpoint_status):
+        try:
+            self.__connect()
             self.__cursor.execute(
                     "SELECT COALESCE(MAX(id) + 1,1) FROM model_checkpoint"
             )
@@ -236,7 +247,7 @@ class DBManager:
                     "checkpoint_status, checkpoint_path) ").__add__(
                     "VALUES (?,datetime('now'),?,?,?,?,?,?)")
             self.__cursor.execute(query, [int(newId), getuser(),
-                                          gethostname(), name, version, "CREATED", checkpointPath])
+                                          gethostname(), name, version, checkpoint_status, checkpointPath])
             self.__conn.commit()
             self.__close()
         except Exception as error:
@@ -297,7 +308,7 @@ class DBManager:
             logging.error(str(error), exc_info=True)
             raise
 
-    def modelTrainNewEpoch(self, name, ver):
+    def modelTrainNewEpoch(self, name, ver, target_sample_rate):
         try:
             self.__connect()
             self.__cursor.execute(
@@ -326,7 +337,23 @@ class DBManager:
                     "datetime('now') as insert_datetime ").__add__(
                     "FROM audio_books_tracks AS tracks ").__add__(
                     "JOIN noise_files AS noise ").__add__(
-                    "ON 1=1")
+                    "ON 1=1 ").__add__(
+                    r"WHERE (tracks.track_sample_rate%" + "%d) = 0 " % target_sample_rate).__add__(
+                    r"AND (noise.sample_rate%" + "%d) = 0" % target_sample_rate)
+            self.__cursor.execute(query)
+            self.__conn.commit()
+            self.__close()
+        except Exception as error:
+            self.__close()
+            logging.error(str(error), exc_info=True)
+            raise
+
+    def modelTrainUpdateStatus(self, id_training_track, status):
+        try:
+            self.__connect()
+            query = "UPDATE training_track ".__add__(
+                    "SET status = '" + status + "' ").__add__(
+                    "WHERE id = " + str(id_training_track))
             self.__cursor.execute(query)
             self.__conn.commit()
             self.__close()

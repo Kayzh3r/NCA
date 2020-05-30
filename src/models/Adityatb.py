@@ -16,6 +16,7 @@ from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
+from src.errors import ResamplingError
 
 logger = logging.getLogger('Adityatb Model')
 
@@ -65,14 +66,14 @@ class Adityatb:
 
     def __createModel(self):
         regularizer = l2(self.reg)
-        input_layer = Input(shape=[1,self.n_samples_spectrum])
+        input_layer = Input(shape=(None, self.n_samples_spectrum))
         hid1 = LSTM(self.n_units, return_sequences=True, activation='relu')(input_layer)
         dp1 = Dropout(0.2)(hid1)
         hid2 = LSTM(self.n_units, return_sequences=True, activation='relu')(dp1)
         dp2 = Dropout(0.2)(hid2)
         hid3 = LSTM(self.n_units, return_sequences=True, activation='relu')(dp2)
         y1_hat = TimeDistributed(Dense(self.n_samples_spectrum, activation='softmax',
-                                       input_shape=[1,self.n_samples_spectrum]),
+                                       input_shape=(None, self.n_samples_spectrum)),
                                        name='y1_hat')(hid3)
         out_layer = Dense(self.n_samples_spectrum, activation='softmax',
                            name='softMask')(y1_hat)
@@ -95,12 +96,16 @@ class Adityatb:
         self.__model.save(filename)
 
     def __resample(self, input_signal, input_sampling_rate):
+        if input_sampling_rate % self.input_sampling_rate:
+            raise ResamplingError('Downsampling factor is not integer number\n'
+                                  '\tInput sampling rate: %d\n' % input_sampling_rate +
+                                  '\tTarget sampling rate: %d\n' % self.input_sampling_rate)
         factor = input_sampling_rate/self.input_sampling_rate
         logger.info('Input sampling rate is different from the expected by the model.\n' +
                     '\rInput sampling rate: ' + str(input_sampling_rate) + '\n' +
                     '\rModel sampling rate: ' + str(self.input_sampling_rate) + '\n' +
                     'Resampling input signal by factor: ' + str(factor))
-        in_signal = decimate(input_signal, factor)
+        in_signal = decimate(input_signal, int(factor))
         return in_signal
 
     def __prepateInput(self, input_signal, sampling_rate):
@@ -114,6 +119,7 @@ class Adityatb:
             # detrend='constant',
             return_onesided=True, scaling='spectrum', axis=-1, mode='complex')
         db_values = amplitude_to_db(np.abs(stft))
+        db_values = np.transpose(db_values)[:, np.newaxis, :]
         phase = np.angle(stft)
         return [freq, time, db_values, phase]
 
@@ -126,13 +132,12 @@ class Adityatb:
                                nfft=self.n_samples_window)
         return data_recovered
 
-    def train(self, dirtyAudio, cleanAudio, sampling_rate):
-        _, _, db_values_dirty, _ = self.__prepateInput(dirtyAudio, sampling_rate)
-        _, _, db_values_clean, _ = self.__prepateInput(cleanAudio, sampling_rate)
-        self.__model.fit(db_values_dirty, db_values_dirty,
+    def train(self, dirtyAudio, dirty_sampling_rate, cleanAudio, clean_sampling_rate):
+        _, _, db_values_dirty, _ = self.__prepateInput(dirtyAudio, dirty_sampling_rate)
+        _, _, db_values_clean, _ = self.__prepateInput(cleanAudio, clean_sampling_rate)
+        self.__model.fit(db_values_dirty, db_values_clean,
                          batch_size=self.batch_size,
-                         epochs=1,
-                         validation_split=0.1)
+                         epochs=20)
 
     def predict(self, dirtyAudio, sampling_rate):
         _, _, db_values_dirty, phase = self.__prepateInput(dirtyAudio, sampling_rate)

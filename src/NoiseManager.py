@@ -3,14 +3,13 @@ import audioread
 import logging
 import os
 import youtube_dl
-from pydub import AudioSegment, effects
 
 from src.DBManager import DBManager
 
 logger = logging.getLogger('NoiseManager')
 
 
-class NoiseManager():
+class NoiseManager:
     def __init__(self, db=DBManager()):
         self.resources = {
             'airDryer': 'https://www.youtube.com/watch?v=PNAGqh2h3AA',
@@ -66,16 +65,6 @@ class NoiseManager():
                     self.db.noiseCreate(key, self.resources[key],
                                         filename, fId.channels,
                                         fId.samplerate, fId.duration)
-
-    def loadNoise(self, path, normalized=True):
-        ext = os.path.splitext(path)[1][1:]
-        logger.info('Loading noise ' + path + ' with file type ' + ext)
-        rawSound = AudioSegment.from_file(path, ext)
-        if normalized:
-            logger.info('Normalize noise')
-            return effects.normalize(rawSound)
-        else:
-            return rawSound
 
 
 if __name__ == '__main__':

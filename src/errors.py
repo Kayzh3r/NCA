@@ -23,3 +23,14 @@ class InitializationError(Exception):
 
     def __init__(self, message):
         self.message = message
+
+class ResamplingError(Exception):
+    """Exception raised for wrong initialization.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
