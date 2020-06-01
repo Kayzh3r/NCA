@@ -11,39 +11,70 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import LSTM
-from tensorflow.keras.layers import Lambda
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import TimeDistributed
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
+from h5py import File as H5File
 from src.errors import ResamplingError
 
-logger = logging.getLogger('Adityatb Model')
+logger = logging.getLogger('Adityatb-based Model')
 
 
-def compute_soft_mask(y1, y2):
-    y1 = np.abs(y1)
-    y2 = np.abs(y2)
-    m1 = np.divide(y1, np.add(y1, y2))
-    m2 = np.divide(y2, np.add(y1, y2))
-    # m2 = 1 - m1
-    return [m1, m2]
+class DataGenerator(keras.utils.Sequence):
+    """Generates data for Keras"""
+    def __init__(self, h5_file_path, batch_size=32, noise=[], shuffle=True):
+        self.batch_size = batch_size
+        self.h5_file_path = h5_file_path
+        self.noise = noise
+        self.shuffle = shuffle
+        self.h5_info = None
+
+        self.__startup()
+        self.on_epoch_end()
+
+    def __startup(self):
+        with H5File(self.h5_file_path) as f:
 
 
-def soft_masking(y):
-    input = y[0]
-    y1_hat = y[1]
-    y2_hat = y[2]
-    s1, s2 = compute_soft_mask(y1_hat,y2_hat)
-    y1_tilde = np.multiply(s1, input)
-    y2_tilde = np.multiply(s2, input)
-    return [y1_tilde, y2_tilde]
+    def __len__(self):
+        """Denotes the number of batches per epoch"""
+        return int(np.floor(len(self.list_IDs) / self.batch_size))
 
+    def __getitem__(self, index):
+        """Generate one batch of data"""
+        # Generate indexes of the batch
+        indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
 
-def masked_out_shape(shape):
-    shape_0 = list(shape[0])
-    shape_1 = list(shape[1])
-    return [tuple(shape_0),tuple(shape_1)]
+        # Find list of IDs
+        list_IDs_temp = [self.list_IDs[k] for k in indexes]
+
+        # Generate data
+        X, y = self.__data_generation(list_IDs_temp)
+
+        return X, y
+
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        self.indexes = np.arange(len(self.list_IDs))
+        if self.shuffle == True:
+            np.random.shuffle(self.indexes)
+
+    def __data_generation(self, list_IDs_temp):
+        """Generates data containing batch_size samples"""  # X : (n_samples, *dim, n_channels)
+        # Initialization
+        X = np.empty((self.batch_size, *self.dim, self.n_channels))
+        y = np.empty((self.batch_size), dtype=int)
+
+        # Generate data
+        for i, ID in enumerate(list_IDs_temp):
+            # Store sample
+            X[i,] = np.load('data/' + ID + '.npy')
+
+            # Store class
+            y[i] = self.labels[ID]
+
+        return X, keras.utils.to_categorical(y, num_classes=self.n_classes)
 
 
 class Adityatb:
@@ -77,8 +108,6 @@ class Adityatb:
                                        name='y1_hat')(hid3)
         out_layer = Dense(self.n_samples_spectrum, activation='softmax',
                            name='softMask')(y1_hat)
-        #out_layer = Lambda(soft_masking, output_shape=masked_out_shape,
-        #                   name='softMask')([input_layer, y1_hat])
 
         self.__model = Model(inputs=input_layer, outputs=out_layer)
         model_info = []
@@ -132,9 +161,7 @@ class Adityatb:
                                nfft=self.n_samples_window)
         return data_recovered
 
-    def train(self, dirtyAudio, dirty_sampling_rate, cleanAudio, clean_sampling_rate):
-        _, _, db_values_dirty, _ = self.__prepateInput(dirtyAudio, dirty_sampling_rate)
-        _, _, db_values_clean, _ = self.__prepateInput(cleanAudio, clean_sampling_rate)
+    def train(self, dirtyAudio, dirty_sampling_rate):
         self.__model.fit(db_values_dirty, db_values_clean,
                          batch_size=self.batch_size,
                          epochs=20)
