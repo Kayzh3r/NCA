@@ -1,12 +1,14 @@
 import logging
 
 import numpy as np
+from argparse import ArgumentParser
 from scipy.signal import decimate
 from scipy.signal import spectrogram
 from scipy.signal import istft
 from scipy.signal import get_window
 from librosa.core import amplitude_to_db
 from tensorflow import keras
+from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import Dense
@@ -21,60 +23,109 @@ from src.errors import ResamplingError
 logger = logging.getLogger('Adityatb-based Model')
 
 
+class GroupInfo:
+    def __init__(self):
+        self.path = ''
+        self.clean_shape = None
+        self.dirty_shape = None
+        self.n_fft = 0
+        self.attributes = dict()
+
+
+class ModelSaver(Callback):
+    def __init__(self, N):
+        self.N = N
+        self.batch = 0
+
+    def on_batch_end(self, batch, logs={}):
+        if self.batch % self.N == 0:
+            name = './checkpoints/Adityatb%16d.h5' % self.batch
+            logger.info('Saving model %s' % name)
+            self.model.save(name)
+        self.batch += 1
+
+
 class DataGenerator(keras.utils.Sequence):
     """Generates data for Keras"""
-    def __init__(self, h5_file_path, batch_size=32, noise=[], shuffle=True):
+    def __init__(self, h5_file_path, batch_size=32, shuffle=True, fft_size=0):
         self.batch_size = batch_size
         self.h5_file_path = h5_file_path
-        self.noise = noise
         self.shuffle = shuffle
+        self.fft_size = fft_size
         self.h5_info = None
+        self.groups = []
+        self.n_fft = 0
+        self.group_idx = 0
+        self.target_group = None
+        self.fft_idx = 0
 
         self.__startup()
         self.on_epoch_end()
 
     def __startup(self):
-        with H5File(self.h5_file_path) as f:
+        with H5File(self.h5_file_path, 'r') as f:
+            for main_group_key in f.keys():
+                main_group = f[main_group_key]
+                for group_key in main_group.keys():
+                    group = main_group[group_key]
+                    self.__parse_group_info(group)
+        self.target_group = self.groups[0]
 
+    def __parse_group_info(self, h5_group):
+        group_info = GroupInfo()
+        group_info.path = h5_group.name
+        group_info.clean_shape = h5_group['CLEAN/DB'].shape
+        group_info.dirty_shape = h5_group['DIRTY/DB'].shape
+        for key in h5_group.attrs.keys():
+            group_info.attributes[key] = h5_group.attrs[key]
+        if group_info.clean_shape == group_info.dirty_shape:
+            logger.info('Found %d FFTs in %s' % (group_info.clean_shape[0], group_info.path))
+            group_info.n_fft = group_info.clean_shape[0]
+            self.n_fft += group_info.n_fft
+            self.groups.append(group_info)
+        else:
+            logger.info('Number of FFTs mismatch\n\tClean %d\n\tDirty %d' %
+                        (group_info.clean_shape[0], group_info.dirty_shape[0]))
+
+    def __increment_target_group(self):
+        self.group_idx += 1
+        self.target_group = self.groups[self.group_idx]
+        self.fft_idx = 0
 
     def __len__(self):
         """Denotes the number of batches per epoch"""
-        return int(np.floor(len(self.list_IDs) / self.batch_size))
+        n_batches = int(np.floor(self.n_fft / self.batch_size))
+        #logger.debug('Number of batches %d' % n_batches)
+        return n_batches
 
     def __getitem__(self, index):
         """Generate one batch of data"""
-        # Generate indexes of the batch
-        indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
-
-        # Find list of IDs
-        list_IDs_temp = [self.list_IDs[k] for k in indexes]
 
         # Generate data
-        X, y = self.__data_generation(list_IDs_temp)
+        X, Y = self.__data_generation()
 
-        return X, y
+        return X, Y
 
     def on_epoch_end(self):
         'Updates indexes after each epoch'
-        self.indexes = np.arange(len(self.list_IDs))
-        if self.shuffle == True:
-            np.random.shuffle(self.indexes)
+        pass
 
-    def __data_generation(self, list_IDs_temp):
-        """Generates data containing batch_size samples"""  # X : (n_samples, *dim, n_channels)
-        # Initialization
-        X = np.empty((self.batch_size, *self.dim, self.n_channels))
-        y = np.empty((self.batch_size), dtype=int)
+    def __data_generation(self):
+        """Generates data containing in batch_size"""
+        X = np.empty((self.batch_size, 1, self.fft_size), dtype=np.float64)
+        Y = np.empty((self.batch_size, 1, self.fft_size), dtype=np.float64)
 
         # Generate data
-        for i, ID in enumerate(list_IDs_temp):
-            # Store sample
-            X[i,] = np.load('data/' + ID + '.npy')
+        with H5File(self.h5_file_path, 'r') as f:
+            for idx in range(self.batch_size):
+                # Store sample
+                X[idx, :, :] = f[self.target_group.path + '/DIRTY/DB'][self.fft_idx, :, :]
+                Y[idx, :, :] = f[self.target_group.path + '/CLEAN/DB'][self.fft_idx, :, :]
+                self.fft_idx += 1
+                if self.fft_idx >= self.target_group.n_fft:
+                    self.__increment_target_group()
 
-            # Store class
-            y[i] = self.labels[ID]
-
-        return X, keras.utils.to_categorical(y, num_classes=self.n_classes)
+        return X, Y
 
 
 class Adityatb:
@@ -82,12 +133,14 @@ class Adityatb:
         self.batch_size = 32
         self.reg = 0.05
         self.learning_rate = 1e-5
-        self.n_units = 600
+        self.n_units = 300
         self.decay = 1e-3
         self.input_sampling_rate = 11025
         self.n_samples_window = 1024
         self.n_samples_spectrum = int(1024/2) + 1
         self.overlap = 0.5
+        self.training_generator = None
+        self.saver_callback = None
         if checkpoint:
             logger.info('Model checkpoint input obtained')
             self.__model = keras.models.load_model(checkpoint.replace('\\', '/'))
@@ -161,13 +214,54 @@ class Adityatb:
                                nfft=self.n_samples_window)
         return data_recovered
 
-    def train(self, dirtyAudio, dirty_sampling_rate):
-        self.__model.fit(db_values_dirty, db_values_clean,
-                         batch_size=self.batch_size,
-                         epochs=20)
+    def train(self, file_name, epochs, save):
+        self.training_generator = DataGenerator(h5_file_path=file_name, batch_size=32, fft_size=self.n_samples_spectrum)
+        self.saver_callback = ModelSaver(save)
+        self.__model.fit_generator(generator=self.training_generator,
+                                   use_multiprocessing=True,
+                                   max_queue_size=50,
+                                   workers=16, epochs=epochs,
+                                   callbacks=[self.saver_callback])
 
     def predict(self, dirtyAudio, sampling_rate):
         _, _, db_values_dirty, phase = self.__prepateInput(dirtyAudio, sampling_rate)
         clean_mod = self.__model.predict(db_values_dirty)
         clean_audio = self.__prepareOutput(clean_mod,phase)
         return clean_audio
+
+
+if __name__ == "__main__":
+    try:
+        # set up logging to file
+        logging.basicConfig(level=logging.DEBUG,
+                            format='%(asctime)s %(name)-20s %(levelname)-8s %(message)s',
+                            datefmt='%m-%d %H:%M',
+                            filename='./train.log',
+                            filemode='w+')
+        # define a Handler which writes DEBUG messages or higher to the sys.stderr
+        console = logging.StreamHandler()
+        console.setLevel(logging.DEBUG)
+        # set a format which is simpler for console use
+        formatter = logging.Formatter('%(asctime)s %(name)-20s %(levelname)-8s %(message)s')
+        # tell the handler to use this format
+        console.setFormatter(formatter)
+        # add the handler to the root logger
+        logging.getLogger('').addHandler(console)
+
+        parser = ArgumentParser()
+        parser.add_argument("-t", "--train", help="Path of the H5 training data", default='')
+        parser.add_argument("-e", "--epochs", help="Number of epochs for training the model", type=int, default=20)
+        parser.add_argument("-s", "--save", help="Number of epochs for saving the model", type=int, default=400000)
+        parser.add_argument("-l", "--load", help="Load model from checkpoint", default='')
+        args = parser.parse_args()
+
+        logging.info('Starting program execution')
+        if args.load:
+            model = Adityatb(checkpoint=args.load)
+        else:
+            model = Adityatb()
+        if args.train:
+            model.train(file_name=args.train, epochs=args.epochs, save=args.save)
+
+    except Exception as e:
+        logging.error('Something was wrong', exc_info=True)
