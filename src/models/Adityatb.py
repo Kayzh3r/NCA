@@ -36,6 +36,7 @@ class ModelSaver(Callback):
     def __init__(self, N):
         self.N = N
         self.batch = 0
+        self.epoch = 0
 
     def on_batch_end(self, batch, logs={}):
         if self.batch % self.N == 0:
@@ -43,6 +44,10 @@ class ModelSaver(Callback):
             logger.info('Saving model %s' % name)
             self.model.save(name)
         self.batch += 1
+
+    def on_epoch_begin(self, epoch, logs=None):
+        name = './checkpoints/Adityatb%4d.h5' % self.epoch
+
 
 
 class DataGenerator(keras.utils.Sequence):
@@ -132,7 +137,7 @@ class Adityatb:
     def __init__(self, checkpoint=None):
         self.batch_size = 32
         self.reg = 0.05
-        self.learning_rate = 1e-5
+        self.learning_rate = 1e-3
         self.n_units = 300
         self.decay = 1e-3
         self.input_sampling_rate = 11025
@@ -168,7 +173,9 @@ class Adityatb:
         model_info = '\n\t'.join(model_info)
         logger.info(model_info)
 
-        opt = Adam(lr=self.learning_rate, decay=self.decay)
+        opt = Adam(lr=self.learning_rate#,
+                   #decay=self.decay
+                   )
         self.__model.compile(loss='kullback_leibler_divergence',
                              optimizer=opt,
                              metrics=['acc', 'mse'])

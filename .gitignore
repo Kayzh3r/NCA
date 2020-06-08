@@ -142,3 +142,21 @@ audio_processing.prproj
 
 # .idea folder
 .idea/*
+
+# Notebooks pictures
+notebooks/*.png
+
+# old files
+*.old
+*.old2
+*.old3
+
+# zip files
+*.zip
+
+# png file
+*.png
+
+# model checkpoints
+src/*.h5
+
