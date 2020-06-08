@@ -42,14 +42,18 @@ class DataManager:
                                                                        self.__N_SAMPLES_WINDOW)))
                 main_group.attrs.create(np.string_('SAMPLE_RATE'), np.string_(self.__INPUT_SAMPLING_RATE))
                 main_group.attrs.create(np.string_('FFT_SIZE'), np.string_(self.__N_SAMPLES_WINDOW))
-                for file_combination in file_combinations:
+                for idx, file_combination in enumerate(file_combinations):
                     try:
                         logging.info('Loading data')
                         clean_info = self.__db.audioBookGetById(file_combination[1])
                         clean = self.load_audio(clean_info[0][9], normalized=False)
-
-                        noise_info = self.__db.noiseGetById(file_combination[2])
-                        noise = self.load_audio(noise_info[0][3], normalized=False)
+                        if idx > 0:
+                            if file_combination[2] != file_combinations[idx - 1][2]:
+                                noise_info = self.__db.noiseGetById(file_combination[2])
+                                noise = self.load_audio(noise_info[0][3], normalized=False)
+                        else:
+                            noise_info = self.__db.noiseGetById(file_combination[2])
+                            noise = self.load_audio(noise_info[0][3], normalized=False)
 
                         if clean.duration_seconds > noise.duration_seconds:
                             logging.info('Clipping clean audio to fit noise audio duration')
@@ -145,13 +149,13 @@ class DataManager:
     @staticmethod
     def load_audio(path, normalized=True):
         ext = os.path.splitext(path)[1][1:]
-        logging.info('Loading noise ' + path + ' with file type ' + ext)
+        logging.info('Loading audio ' + path + ' with file type ' + ext)
         rawSound = AudioSegment.from_file(path, ext)
         if rawSound.channels != 1:
             logging.info('Audio contains more than one channel. Setting to single channel')
             rawSound = rawSound.set_channels(1)
         if normalized:
-            logging.info('Normalize noise')
+            logging.info('Normalize audio')
             return effects.normalize(rawSound)
         else:
             return rawSound

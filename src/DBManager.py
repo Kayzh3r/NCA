@@ -359,7 +359,8 @@ class DBManager:
                     "ON 1=1 ").__add__(
                     r"WHERE (tracks.track_sample_rate%" + "%d) = 0 " % target_sample_rate).__add__(
                     r"AND (noise.sample_rate%" + "%d) = 0 " % target_sample_rate).__add__(
-                    r"AND noise.name IN ('" + "','".join(noises) + "')")
+                    r"AND noise.name IN ('" + "','".join(noises) + "') ").__add__(
+                    "GROUP BY tracks.track_name")
             self.__cursor.execute(query)
             ret_val = self.__cursor.fetchall()
             self.__close()
