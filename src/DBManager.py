@@ -348,7 +348,7 @@ class DBManager:
             logging.error(str(error), exc_info=True)
             raise
 
-    def modelTrainGetCombination(self, target_sample_rate, noises):
+    def modelTrainGetCombination(self, target_sample_rate, noises, limit):
         try:
             self.__connect()
             query = "SELECT ROW_NUMBER() OVER ( ORDER BY tracks.id, noise.id ), ".__add__(
@@ -361,6 +361,8 @@ class DBManager:
                     r"AND (noise.sample_rate%" + "%d) = 0 " % target_sample_rate).__add__(
                     r"AND noise.name IN ('" + "','".join(noises) + "') ").__add__(
                     "GROUP BY tracks.track_name")
+            if limit != 0:
+                query += " LIMIT %d" % limit
             self.__cursor.execute(query)
             ret_val = self.__cursor.fetchall()
             self.__close()
